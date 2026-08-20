@@ -148,7 +148,7 @@ the fastest route to an answer is the grep handle, not the filename.
 | `cli-reference.md` | the 1.x command tree and the `--filter` system | 24 | `^## COMMAND:` |
 | `hcl-blocks.md` | every HCL block and attribute | 15 / 10 | `^## BLOCK:` `^## ATTRIBUTE:` |
 | `advanced-examples.md` | worked examples: multi-account/subscription/project, CI, mocks, AVM, CFT, own-module | 28 | `^## EXAMPLE:` |
-| `architecture-patterns.md` | layout patterns, catalog/live repo shape, migration to stacks | 6 | `^## PATTERN:` |
+| `architecture-patterns.md` | layout patterns, catalog/live repo shape, migration to stacks | 7 | `^## PATTERN:` |
 | `cicd.md` | OIDC per cloud, plan-then-apply across a stack | — | grep a `^## ` heading |
 | `azure-backend.md` | Azure state, auth and provider gotchas | — | read whole; it is short |
 | `scale-and-performance.md` | run only what changed, cache, parallelism | — | read whole; it is short |
@@ -214,8 +214,12 @@ secrets/account IDs — ask or use obvious dummies labelled as such.
 
 ## GENERATE workflow
 
-1. Determine pattern via references/architecture-patterns.md; output the pattern selection
-   checklist (in that file) before writing files.
+1. Determine pattern via references/architecture-patterns.md, then **print the pattern
+   selection checklist from that file before writing anything.** Not a summary of it, not
+   "the pattern is X" in prose — the filled-in block. Three recorded runs of this workflow
+   skipped it and two of those chose a layout the request had explicitly ruled out; the
+   checklist is where the account-vs-region decision is forced into the open. If accounts
+   and regions both vary, read `## PATTERN: two accounts, many regions` first.
 2. Read the relevant template(s); adapt, don't freestyle.
 3. Verify the include/read graph: every `find_in_parent_folders`/`read_terragrunt_config`
    target must exist from the referencing file's location.

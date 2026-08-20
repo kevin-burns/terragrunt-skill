@@ -268,6 +268,126 @@ infrastructure-live/
 That `_envcommon/` is the centralised-environment-definitions pattern above, under Gruntwork's
 own name for it.
 
+## PATTERN: two accounts, many regions (accounts isolate state, one file holds the region list)
+
+Use when the estate spans **more than one account** and **more than one region**, and the
+region list is expected to grow. Account and region are different axes, and the common mistake
+is to treat them as one — putting both in the directory tree, so adding a region means copying
+a subtree into every environment.
+
+- **Account is a state boundary.** One state bucket per account; `account.hcl` is the single
+  file per account that names it. `root.hcl` reads `account.hcl` and nothing else, which is
+  what keeps it environment-agnostic (see the inviolable rule at the top of this file).
+- **Region is a multiplicity, not a directory.** It belongs in `values` on a `stack` block.
+  One stack file lists the active regions and every environment instantiates that same file,
+  so adding a region is one block in one file and no environment's tree changes.
+
+```
+live/
+├── root.hcl                                    # env-agnostic; reads account.hcl only
+├── non-prod/
+│   ├── account.hcl                             # account id + state bucket for this account
+│   ├── dev/       {env.hcl, terragrunt.stack.hcl}
+│   └── staging/   {env.hcl, terragrunt.stack.hcl}
+└── prod/
+    ├── account.hcl
+    └── env.hcl, terragrunt.stack.hcl
+catalog/                                        # SIBLING of live/, not inside it — trap 3
+├── stacks/all-regions/terragrunt.stack.hcl     # THE region list, in one place
+├── stacks/region-stack/terragrunt.stack.hcl    # what exists once per region
+└── units/{vpc,s3-bucket}/terragrunt.hcl        # parameterised by values.*
+```
+
+Each environment's stack file instantiates the region list, passing only what varies by
+environment:
+
+```hcl
+# live/prod/terragrunt.stack.hcl
+locals {
+  infra_root = dirname(find_in_parent_folders("root.hcl"))
+  env        = read_terragrunt_config("env.hcl")   # NOT find_in_parent_folders — trap 1
+}
+
+stack "regions" {
+  source = "${local.infra_root}/../catalog/stacks/all-regions"
+  path   = "regions"
+  values = { environment = local.env.locals.environment }
+}
+```
+
+The region list forwards `environment` down and adds the one thing it owns:
+
+```hcl
+# catalog/stacks/all-regions/terragrunt.stack.hcl — the only place regions are named
+stack "eu-central-1" {
+  source                  = "${local.infra_root}/../catalog/stacks/region-stack"
+  path                    = "eu-central-1"
+  no_dot_terragrunt_stack = true                    # keeps state keys as regions/<region>/<unit>
+  values = { aws_region = "eu-central-1", environment = values.environment }
+}
+```
+
+### Three traps, each one measured on a generated tree
+
+**1. `find_in_parent_folders` does not look in the current folder.** `env.hcl` sits *beside*
+the environment's `terragrunt.stack.hcl`, not above it, so
+`read_terragrunt_config(find_in_parent_folders("env.hcl"))` walks past it to the repo root and
+fails the whole tree. One of the three runs wrote exactly this, and nothing before
+`stack generate` caught it — the file parses, formats clean, and the include graph looks
+plausible:
+
+```
+Call to function "find_in_parent_folders" failed: ParentFileNotFoundError: Could not find a
+env.hcl in any of the parent folders of .../dev/terragrunt.stack.hcl. Cause: Traversed all the
+way to the root..
+```
+
+Use `read_terragrunt_config("env.hcl")`. A relative path resolves against the config file's own
+directory, not the shell's, so it holds whether the command is run from that environment or
+from the repo root — both were run. `read_terragrunt_config("${get_terragrunt_dir()}/env.hcl")`
+is equivalent and more explicit; pick one. `account.hcl` is the contrast that makes the rule
+legible: it genuinely *is* in a parent folder, so `find_in_parent_folders` is right there and
+wrong one directory down.
+
+Filed as `## ERROR: ParentFileNotFoundError on a file that sits beside the config` in
+`references/error-patterns.md`. Worth knowing where the wrong form comes from: the
+`find_in_parent_folders` entry in
+`functions.md` uses `env.hcl` as its own example filename, and the `read_terragrunt_config`
+entry pairs itself with `find_in_parent_folders` in its first example. Copying the house style
+of the surrounding examples is exactly how this lands in a stack file where it cannot work.
+
+**2. `hcl validate` cannot judge a catalog unit in place.** Catalog units reference `values.*`,
+which is bound only when `terragrunt stack generate` materialises them. Validating the raw tree
+reports every one of those as `Error: Unknown variable` — noise, not defects. Validate the
+*generated* units: `terragrunt stack generate`, then `hcl validate`. On the tree above that is
+3 environments × 2 regions × 2 units = 12 generated units, all clean, while the same command
+over the un-materialised `catalog/` reports 24 errors that mean nothing.
+
+**3. A `catalog/` inside the live tree breaks estate-wide commands.** `stack generate` from the
+repo root discovers and parses the catalog's own stack files, hits the unbound `values.*` from
+trap 2, and fails before generating anything. `--filter` does not exclude them. Either run
+`stack generate` per environment, or keep the catalog outside the live tree — a sibling
+directory is enough, and the two-repo model above does it by construction. Measured on the tree
+above: catalog inside → root-level generate fails; catalog moved to a sibling → 0 errors, all
+12 units generated by one command, `hcl validate` over the live tree clean.
+
+> **Provenance, and why this is written down at all.** Asked conversationally for a
+> two-account two-region AWS repo — with "adding a region later shouldn't mean copy-pasting a
+> directory tree" stated in the request — this skill was run three times. **Two of the three
+> put the region in the directory tree** (`account/region/env/`), which is the layout Gruntwork's
+> live-example repo uses and which the catalog pattern above shows. It is a good default and it
+> does not satisfy that request: a third region means three more directories per environment.
+> One run produced the layout above. This section exists so the region-as-`values` option is
+> reachable rather than a one-in-three outcome.
+>
+> All three trees were then run through `terragrunt hcl fmt`, `hcl validate` and
+> `stack generate` on **terragrunt 1.1.3**. Every one generated 12 units (3 environments × 2
+> regions × 2 units) that validate clean; one needed the one-line fix in trap 1 first, and one
+> fails `hcl fmt --check` on comment alignment. The three traps below are what broke.
+
+Docs: https://docs.terragrunt.com/features/stacks/explicit/ ·
+https://docs.terragrunt.com/reference/cli/commands/stack/generate/
+
 ## PATTERN: migrate an existing tree to explicit stacks
 
 Use when an existing implicit layout (directory tree of `terragrunt.hcl` units, often with an
@@ -373,11 +493,21 @@ Complete and show this before writing files:
 ## Architecture Pattern Selection
 [x] Pattern: <multi-env agnostic root | env-aware root | _env centralized | explicit stack>
 [x] root.hcl scope: environment-agnostic | environment-aware
+[x] Accounts: <n> — one state bucket each, anchored in which file? ____
+[x] Regions: <list> — carried as stack `values`, or as directories? ____
+    (if the user said adding a region must not mean copying a tree, it is `values` —
+     see `## PATTERN: two accounts, many regions`)
 [x] env.hcl location(s): ____
 [x] Units access env via: ____
 [x] Backend: <s3 | gcs | azurerm (pass-through, see templates/backends note)>
 [x] Verified: every referenced path exists from the referencing file's location
+    (find_in_parent_folders never looks in the referencing file's OWN directory)
 ```
+
+**Emit this before writing files, not after.** Three runs of the generate workflow were
+recorded on 2026-08-20 and none of them printed it; two then chose a layout the request had
+ruled out. The checklist is where the account/region decision gets made explicit, which is the
+whole reason it comes first.
 
 ## Starter variable files
 
