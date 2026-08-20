@@ -270,10 +270,30 @@ own name for it.
 
 ## PATTERN: two accounts, many regions (accounts isolate state, one file holds the region list)
 
+![Region in the tree, or region in a list: the same estate coupled on different axes](../images/two-accounts-many-regions.webp)
+
 Use when the estate spans **more than one account** and **more than one region**, and the
-region list is expected to grow. Account and region are different axes, and the common mistake
-is to treat them as one — putting both in the directory tree, so adding a region means copying
-a subtree into every environment.
+region list is expected to grow.
+
+**First, what Gruntwork actually publishes, because this pattern departs from it and should say
+so.** Their canonical live repo is `<account>/<region>/<env>/<unit>` with `account.hcl`,
+`region.hcl` and `env.hcl` at their respective levels and a shared `_envcommon/`. The getting-
+started tutorial in the docs builds up to the same shape — a `us-east-1/region.hcl` read from
+`root.hcl`. **That is the default, it is not a mistake, and any layout guide you find will
+show it.** Read on 2026-08-20 from
+[terragrunt-infrastructure-live-example](https://github.com/gruntwork-io/terragrunt-infrastructure-live-example).
+
+**The reason to reach for something else is narrow and worth stating precisely.** That example
+contains exactly **one** region, `us-east-1`, in both accounts. The layout everyone copies has
+never been exercised against the case this pattern is for. Put the region in the tree and
+adding a third one means a new directory in every environment — six become nine here — and each
+is a copy of a tree that already existed.
+
+**The mechanism below is still Gruntwork's**, which matters because this skill does not invent
+layouts. Their catalog example's `stacks/multi-env-stateful-asg-services/terragrunt.stack.hcl`
+lists sibling `stack` blocks pointing at one shared composition and varying only `values` — it
+fans **environments** from a single file. This pattern points the same mechanism at the region
+axis instead.
 
 - **Account is a state boundary.** One state bucket per account; `account.hcl` is the single
   file per account that names it. `root.hcl` reads `account.hcl` and nothing else, which is

@@ -16,7 +16,18 @@ read ONLY the listed reference(s), then act. References are grep-friendly — pr
    `plan-all`, `hclfmt`, `hclvalidate`, `graph-dependencies`, `validate-inputs`,
    `terragrunt-` prefixed flags, the `skip` attribute, `retryable_errors`, or bare
    `find_in_parent_folders()` pointing at a root `terragrunt.hcl`. If user code contains
-   these, flag them and propose the 1.x form.
+   these, flag them and propose the 1.x form. **Emit the replacement, never just the ban:**
+   `run --all`, `hcl fmt`, `hcl validate`, `dag graph`, **`hcl validate --inputs`** (add
+   `--strict` to fail on inputs the module does not declare), the unprefixed flag, the
+   `exclude` block, `errors { retry { retryable_errors = [...] } }` (the attribute name is
+   unchanged; what moved is its position, so a bare top-level `retryable_errors` is the
+   pre-1.0 form and the nested one is current), and `find_in_parent_folders("root.hcl")`.
+
+   > `hcl validate --inputs` is spelled out here because an ablation showed it is the one
+   > banned form this policy was carrying on its own. With the ban removed, every other form
+   > held at zero violations — the surrounding 1.x examples were enough — while
+   > `validate-inputs`, removed in v1.0.0, accounted for **16 of 16** remaining violations. It was the only one
+   > with no correct form shown anywhere in this file. See `evals/RESULTS.md`.
 2. **Fact-based generation.** Every generated pattern must trace to a documented Gruntwork
    pattern (references here carry doc links to docs.terragrunt.com). Don't invent layouts.
 3. **Knowledge freshness. This skill does not assert what the current Terragrunt release is.**

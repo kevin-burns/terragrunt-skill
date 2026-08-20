@@ -367,12 +367,22 @@ This checks for parsing errors, unknown blocks, and invalid attribute references
 Does not validate Terraform configurations.
 
 **Options:**
+- `--inputs`: check that the inputs Terragrunt passes line up with the variables the
+  OpenTofu/Terraform module declares. **This is the 1.x home of the removed
+  `terragrunt validate-inputs` command** — the capability was renamed, not dropped.
+- `--strict` with `--inputs`: also fail on inputs defined in Terragrunt that the module
+  never uses. Without `--inputs` it is the general strict mode.
 - `--json`: Output validation results in JSON format
-- `--strict`: Enable strict validation (treat warnings as errors)
 
 *Validate all Terragrunt files*
 ```bash
 terragrunt hcl validate
+```
+
+*What replaced the removed `validate-inputs` command*
+```bash
+terragrunt hcl validate --inputs             # missing / mismatched inputs
+terragrunt hcl validate --inputs --strict    # also flag inputs the module ignores
 ```
 
 *Validate with strict mode*
