@@ -3,6 +3,12 @@
 arms/
 runs/
 
+# The on-disk arms are a generated COPY of the whole skill -- SKILL.md plus references,
+# templates and scripts. Same rule as arms/ above and for the same reason: an arm committed
+# once is compared against a fresh one forever after. Rebuild with
+#   uv run evals/build_arms.py --on-disk
+arms-disk/
+
 # Harvested pages from docs.terragrunt.com and elsewhere, kept as a local cache so a
 # reference claim can be re-checked against what the docs actually said. The frontmatter
 # (source_url, retrieved_at, content_sha256) IS the citation; the body is third-party text

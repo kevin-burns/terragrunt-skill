@@ -110,6 +110,44 @@ Spend is capped by OpenRouter on the key itself, so a runaway loop cannot exceed
 curl -s -H "Authorization: Bearer $OPENROUTER_API_KEY" https://openrouter.ai/api/v1/key
 ```
 
+## The routing suite — a third suite, not a replacement
+
+The two suites above put SKILL.md in a system prompt and disallow the read tools, so nothing
+can reach what was stripped. That isolates SKILL.md cleanly, and it makes two things
+unmeasurable: the ten reference files (~31,000 words) are unreachable, so nothing says whether
+they are any good; and routing cannot be asked at all, because the skill is always on and
+there is no file for the agent to choose to open.
+
+This one materialises the arm ON DISK and allows the read tools. The leak is prevented by
+what is on disk, not by removing the tools.
+
+```bash
+uv run evals/build_arms.py --on-disk
+SMOKE=1 ./evals/matrix_routing.sh          # 4 cells, ~$0.60
+uv run evals/grade_routing.py
+```
+
+It grades a stream of TOOL CALLS rather than text, and asks three things in order of weight:
+did any read leave the sandbox, did the arm open SKILL.md at all, and which reference did it
+open. `routing.json` holds the expected reference per case with the reasoning written beside
+it; the MODE-to-reference half is parsed out of SKILL.md's own router so an edit propagates.
+
+**The allowlist is not the control.** The design for this suite argued that
+`--allowed-tools "Read" "Grep" "Glob"` was safer than a denylist. It is not, and the first
+real run proved it: the agent called Bash five times and read
+`~/.claude/skills/terragrunt-skill/references/cli-reference.md` — the author's real installed
+skill. `--allowed-tools` does not restrict what may run; `--disallowed-tools` does. Both are
+set now, and the grader treats a leaked run as **not a measurement** rather than a bad score.
+
+**Arm P is confounded here.** P is "SKILL.md minus the ban", but once `references/` is
+readable, `hcl-blocks.md` still says `retryable_errors` was removed in 1.0. The ban leaks back
+in through the references and the ablation does not ablate, so this suite defaults to `C S`.
+The C/S/P comparison that produces the published figure stays with the inlined arms.
+
+**It confounds routing with content.** A wrong answer here does not say whether the router
+sent it to the wrong file or the right file failed it. That is precisely why the inlined suite
+stays.
+
 ## The three arms
 
 | arm | contents | what it isolates |
