@@ -9,6 +9,9 @@
 #   CASES="1 5" ARMS="C S" REPS="1 2 3" ./matrix.sh
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# Default is the canonical bank. Set RUNS_DIR to check something without
+# overwriting the runs that carry the published figure.
+RUNS_DIR="${RUNS_DIR:-runs}"
 
 # SMOKE=1 is the cheap default for "did I break it": the two cases carrying the most signal,
 # every arm, one replicate. 6 runs. Case 1 (run-all) has the largest control effect; case 3
@@ -42,15 +45,17 @@ n=0
 for c in $CASES; do
   for a in $ARMS; do
     for r in $REPS; do
-      out="$HERE/runs/${c}-${a}-${r}.json"
+      out="$HERE/${RUNS_DIR}/${c}-${a}-${r}.json"
       # Lesson 5: a banked result is silently reused. Move runs/ aside whenever SKILL.md
       # has moved, or this will compare today's arm against last week's answer.
       [ -s "$out" ] && { echo "skip $c-$a-$r"; continue; }
-      "$HERE/run.sh" "$a" "$c" "$r" &
+      RUNS_DIR="$RUNS_DIR" "$HERE/run.sh" "$a" "$c" "$r" &
       n=$((n+1))
       if [ $((n % 3)) -eq 0 ]; then wait; fi
     done
   done
 done
 wait
-echo "matrix complete: $(ls "$HERE"/runs/*.json 2>/dev/null | grep -c json) result files"
+written=("$HERE/$RUNS_DIR"/*.json)
+[ -e "${written[0]}" ] || written=()
+echo "matrix complete: ${#written[@]} result files in $RUNS_DIR/"

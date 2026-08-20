@@ -15,7 +15,9 @@ cannot be: it exists to route hits to a human, not to replace one. What is teste
 routes the obvious cases the right way and never silently drops a hit.
 """
 
+import hashlib
 import importlib.util
+import json
 import pathlib
 
 spec = importlib.util.spec_from_file_location(
@@ -238,3 +240,74 @@ def test_a_file_that_is_not_a_cell_is_dropped_rather_than_crashing():
     the grader down mid-run."""
     files = [pathlib.Path("1-C-1.json"), pathlib.Path("adjudications.json")]
     assert [p.name for p in grade.filter_cases(files, "1")] == ["1-C-1.json"]
+
+
+# --------------------------------------------------------------------- arm provenance
+
+def _bank(tmp_path, monkeypatch, runs: dict, arms: dict):
+    """A throwaway evals/ layout: arms/<A>.md plus runs/<case>-<arm>-<rep>.json."""
+    (tmp_path / "arms").mkdir()
+    for arm, text in arms.items():
+        (tmp_path / "arms" / f"{arm}.md").write_text(text)
+    (tmp_path / "runs").mkdir()
+    for name, env in runs.items():
+        (tmp_path / "runs" / f"{name}.json").write_text(json.dumps(env))
+    monkeypatch.setattr(grade, "HERE", tmp_path)
+    return sorted((tmp_path / "runs").glob("*.json"))
+
+
+def _sha(text):
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def test_a_run_stamped_with_the_current_arm_is_neither_stale_nor_unstamped(tmp_path, monkeypatch):
+    arm = "# policy\n"
+    files = _bank(tmp_path, monkeypatch,
+                  {"1-S-1": {"result": "", "arm": "S", "arm_sha256": _sha(arm)}},
+                  {"S": arm})
+    _, stale, unstamped = grade.arm_provenance(files)
+    assert stale == [] and unstamped == []
+
+
+def test_a_run_made_against_a_different_arm_is_reported_stale(tmp_path, monkeypatch):
+    """The failure this exists for. The arms were built 2026-08-19 22:29 and SKILL.md moved
+    the next morning; the only thing linking a run to its arm was a comment telling you to
+    move runs/ aside, and it went stale the same day it was written."""
+    files = _bank(tmp_path, monkeypatch,
+                  {"1-S-1": {"result": "", "arm": "S", "arm_sha256": _sha("# yesterday\n")}},
+                  {"S": "# today, with a new quick-nav table\n"})
+    _, stale, unstamped = grade.arm_provenance(files)
+    assert stale == ["1-S-1"]
+    assert unstamped == []
+
+
+def test_an_unstamped_run_is_not_reported_as_stale(tmp_path, monkeypatch):
+    """Runs banked before stamping cannot be verified either way. Calling them stale would be
+    asserting something unknown, and the 63 runs carrying the published figure are all of
+    them -- reporting those as wrong would be a louder error than the one being fixed."""
+    files = _bank(tmp_path, monkeypatch,
+                  {"1-S-1": {"result": ""}}, {"S": "# today\n"})
+    _, stale, unstamped = grade.arm_provenance(files)
+    assert stale == []
+    assert unstamped == ["1-S-1"]
+
+
+def test_a_damaged_envelope_does_not_break_the_provenance_check(tmp_path, monkeypatch):
+    """result_text already reports damage. Raising here would lose the whole report over one
+    truncated file."""
+    files = _bank(tmp_path, monkeypatch, {}, {"S": "# today\n"})
+    (tmp_path / "runs" / "1-S-1.json").write_text("{not json")
+    files = sorted((tmp_path / "runs").glob("*.json"))
+    _, stale, unstamped = grade.arm_provenance(files)
+    assert stale == [] and unstamped == []
+
+
+def test_provenance_is_checked_per_arm_not_globally(tmp_path, monkeypatch):
+    """C, S and P are three different files. A stale S must not implicate a current C."""
+    c, s = "# empty\n", "# policy\n"
+    files = _bank(tmp_path, monkeypatch, {
+        "1-C-1": {"result": "", "arm": "C", "arm_sha256": _sha(c)},
+        "1-S-1": {"result": "", "arm": "S", "arm_sha256": _sha("# old S\n")},
+    }, {"C": c, "S": s})
+    _, stale, unstamped = grade.arm_provenance(files)
+    assert stale == ["1-S-1"]

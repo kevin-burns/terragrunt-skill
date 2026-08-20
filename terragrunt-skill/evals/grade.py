@@ -123,6 +123,43 @@ def parse_name(p: pathlib.Path) -> tuple[str, str, str] | None:
     return (m.group(1), m.group(2), m.group(3)) if m else None
 
 
+def arm_provenance(files: list[pathlib.Path]) -> tuple[dict[str, str], list[str], list[str]]:
+    """Which arm each banked run was ACTUALLY given, against the arms on disk now.
+
+    Until 2026-08-20 the only thing linking a run to its arm was a comment in matrix.sh
+    saying to move runs/ aside when SKILL.md moved. That instruction went stale the same day
+    it was written -- the arms were built at 22:29 on 08-19, SKILL.md moved at 09:38 the next
+    morning, and nothing anywhere noticed. Comparing today's arm against last week's answer is
+    the one way this harness can produce a confidently wrong number.
+
+    Returns (current arm hashes, stale run names, unstamped run names). UNSTAMPED means the
+    run predates the stamp: it cannot be verified either way, which is not the same as being
+    wrong and is not reported as if it were.
+    """
+    current = {}
+    for arm in ("C", "S", "P"):
+        path = HERE / "arms" / f"{arm}.md"
+        if path.exists():
+            current[arm] = hashlib.sha256(path.read_bytes()).hexdigest()
+
+    stale, unstamped = [], []
+    for p in files:
+        parsed = parse_name(p)
+        if not parsed:
+            continue
+        _, arm, _ = parsed
+        try:
+            env = json.loads(p.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue          # damaged; result_text already reports it
+        stamped = env.get("arm_sha256")
+        if not stamped:
+            unstamped.append(p.stem)
+        elif arm in current and stamped != current[arm]:
+            stale.append(p.stem)
+    return current, sorted(stale), sorted(unstamped)
+
+
 def filter_cases(files: list[pathlib.Path], spec: str) -> list[pathlib.Path]:
     """Keep only the runs for the named cases. Exists because pooling the positive suite with
     the negative one produces a real number that answers a question nobody asked, and it looks
@@ -238,6 +275,17 @@ def report(hits: list[dict], files: list[pathlib.Path], adj: dict[str, str], fin
     print()
     cases_in = sorted({parse_name(p)[0] for p in files if parse_name(p)}, key=int)
     print(f"BANK: {bank}/   CASES: {','.join(cases_in)}   RUNS: {len(files)}")
+    _, stale, unstamped = arm_provenance(files)
+    if stale:
+        print()
+        print(f"  STALE ARM: {len(stale)} run(s) were produced by a DIFFERENT arm than the one")
+        print("  on disk now. SKILL.md has moved since they were banked, so these compare")
+        print("  today's skill against last week's answer. Re-run them, or move the bank aside:")
+        print("    " + ", ".join(stale[:8]) + (" ..." if len(stale) > 8 else ""))
+    if unstamped:
+        print(f"      {len(unstamped)} run(s) carry no arm hash -- banked before stamping "
+              "began on 2026-08-20.")
+        print("      Their provenance cannot be verified either way. Re-run to clear.")
     if bank != "runs":
         print("      NOT the Claude bank. These runs are a separate experiment and must not")
         print("      be pooled with, or quoted in place of, the runs/ measurement.")
@@ -300,6 +348,11 @@ def report(hits: list[dict], files: list[pathlib.Path], adj: dict[str, str], fin
             print(f"FAIL: --final requires every hit adjudicated; {len(unadjudicated)} outstanding.",
                   file=sys.stderr)
             return 1
+    if final and stale:
+        print()
+        print(f"FAIL: --final refuses a stale arm; {len(stale)} run(s) were produced by an arm "
+              "that no longer matches SKILL.md.", file=sys.stderr)
+        return 1
     return 0
 
 

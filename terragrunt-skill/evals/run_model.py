@@ -28,6 +28,7 @@ Usage:
 """
 
 import argparse
+import hashlib
 import json
 import os
 import pathlib
@@ -164,9 +165,14 @@ def main(argv: list[str] | None = None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / f"{args.case}-{args.arm}-{args.rep}.json"
 
-    resp = call(args.model, build_messages(armfile.read_text(), casefile.read_text()),
+    arm_text = armfile.read_text()
+    resp = call(args.model, build_messages(arm_text, casefile.read_text()),
                 args.max_tokens, api_key())
     env = envelope(resp)
+    # Same stamp run.sh writes. A banked run has to carry the arm it was actually given, or
+    # nothing can tell it apart from one made against a different SKILL.md.
+    env["arm"] = args.arm
+    env["arm_sha256"] = hashlib.sha256(armfile.read_bytes()).hexdigest()
 
     # Same lesson as run.sh: write private, then rename. A cell is either absent or complete,
     # never a half-written file that the grader reads as an empty -- which scores as a pass.
