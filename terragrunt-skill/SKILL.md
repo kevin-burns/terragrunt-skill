@@ -142,7 +142,7 @@ the fastest route to an answer is the grep handle, not the filename.
 
 | Reference | Holds | Entries | Grep handle |
 |---|---|---|---|
-| `error-patterns.md` | diagnosed errors with cause and fix | 68 | `^## ERROR:` |
+| `error-patterns.md` | diagnosed errors: likely causes for every one, a fix for 17 | 69 | `^## ERROR:` |
 | `functions.md` | built-in functions by category | 31 | `^## FUNCTION:` |
 | `best-practices.md` | practices, plus comparisons and decision guides | 29 / 7 / 3 | `^## PRACTICE:` `^## COMPARISON:` `^## DECISION:` |
 | `cli-reference.md` | the 1.x command tree and the `--filter` system | 24 | `^## COMMAND:` |
@@ -165,8 +165,10 @@ Counts are verified against the files, not asserted: regenerate with
 - `references/functions.md` — built-in functions by category. `grep '^## FUNCTION: get_env'`
 - `references/cli-reference.md` — full 1.0 command tree + `--filter` system.
   `grep '^## COMMAND: stack run'`
-- `references/error-patterns.md` — 68 diagnosed errors with causes/solutions. Grep error
-  keywords first: `grep -in 'state lock' references/error-patterns.md`
+- `references/error-patterns.md` — 69 diagnosed errors. Every one names likely causes; **17
+  carry a fix**, and an entry with no `**Solutions:**` section has none to give — say so
+  rather than improvising one. Grep error keywords first:
+  `grep -in 'state lock' references/error-patterns.md`
 - `references/best-practices.md` — practices with priority/rationale/antipatterns, plus
   `## COMPARISON:` (e.g. dependency vs dependencies) and `## DECISION:` guides
 - `references/advanced-examples.md` — 28 worked examples. `grep '^## EXAMPLE:'`

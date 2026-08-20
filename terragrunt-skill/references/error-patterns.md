@@ -205,8 +205,6 @@ After apply hook execution failed
 - Resources not yet available
 - Notification service unreachable
 
-**Solutions:**
-
 ## ERROR: Before init hook failed
 
 **Category:** configuration
@@ -217,8 +215,6 @@ Before init hook execution failed
 - Initialization dependencies not met
 - Script path incorrect
 - Environment not ready
-
-**Solutions:**
 
 ## ERROR: Circular dependency in locals
 
@@ -231,8 +227,6 @@ Local variables have circular dependencies
 - Indirect circular reference through multiple locals
 - Self-referencing local
 
-**Solutions:**
-
 ## ERROR: Circular include detected
 
 **Category:** configuration
@@ -243,8 +237,6 @@ Include files create a circular reference
 - File A includes file B which includes file A
 - Indirect circular include through multiple files
 - Self-referencing include
-
-**Solutions:**
 
 ## ERROR: Configuration path not found
 
@@ -257,8 +249,6 @@ Referenced file or directory does not exist
 - File was moved or deleted
 - Relative path resolved incorrectly
 
-**Solutions:**
-
 ## ERROR: Duplicate configuration block
 
 **Category:** configuration
@@ -269,8 +259,6 @@ Configuration block defined multiple times
 - Same block appears twice in terragrunt.hcl
 - Block inherited from include and redefined
 - Merged includes have duplicate blocks
-
-**Solutions:**
 
 ## ERROR: Function evaluation error
 
@@ -283,8 +271,6 @@ Error evaluating Terragrunt function
 - Function not available in this context
 - Runtime error in function execution
 
-**Solutions:**
-
 ## ERROR: Generate if_exists strategy error
 
 **Category:** configuration
@@ -295,8 +281,6 @@ Invalid if_exists strategy in generate block
 - Invalid strategy value
 - Strategy not applicable to situation
 - Typo in strategy name
-
-**Solutions:**
 
 ## ERROR: Generate invalid path
 
@@ -309,8 +293,6 @@ Generated file path is invalid
 - Path traversal outside working directory
 - Absolute path not allowed
 
-**Solutions:**
-
 ## ERROR: Generate permission denied
 
 **Category:** configuration
@@ -321,8 +303,6 @@ Insufficient permissions to write generated file
 - Directory is read-only
 - File ownership issue
 - SELinux or security policy blocking
-
-**Solutions:**
 
 ## ERROR: Generate template error
 
@@ -335,8 +315,6 @@ Error in generate block template
 - Template interpolation failed
 - Function error in contents
 
-**Solutions:**
-
 ## ERROR: Generated file already exists
 
 **Category:** configuration
@@ -347,8 +325,6 @@ Generated file already exists and cannot be overwritten
 - File manually created with same name
 - Previous generation not cleaned up
 - Multiple generates target same file
-
-**Solutions:**
 
 ## ERROR: Hook command failed
 
@@ -361,8 +337,6 @@ Before or after hook command failed
 - Script error
 - Insufficient permissions
 
-**Solutions:**
-
 ## ERROR: Hook environment variable missing
 
 **Category:** configuration
@@ -373,8 +347,6 @@ Required environment variable for hook is missing
 - Environment variable not exported
 - Variable name typo
 - Shell context different
-
-**Solutions:**
 
 ## ERROR: Hook execution timeout
 
@@ -387,8 +359,6 @@ Hook command exceeded timeout
 - Process hung or stuck
 - Timeout value too low
 
-**Solutions:**
-
 ## ERROR: Hook log suppression error
 
 **Category:** configuration
@@ -399,8 +369,6 @@ Error with hook log suppression configuration
 - Invalid suppress_stdout value
 - Logging configuration conflict
 - Output redirection failed
-
-**Solutions:**
 
 ## ERROR: Hook working directory error
 
@@ -413,8 +381,6 @@ Cannot access hook working directory
 - Permissions issue
 - Path resolution failed
 
-**Solutions:**
-
 ## ERROR: Include dependency resolution error
 
 **Category:** configuration
@@ -425,8 +391,6 @@ Cannot resolve dependencies in included configuration
 - Dependency defined in include not accessible
 - Output reference invalid
 - Dependency execution order wrong
-
-**Solutions:**
 
 ## ERROR: Include expose configuration conflict
 
@@ -439,8 +403,6 @@ Conflict in include expose configuration
 - Expose configuration incompatible
 - Invalid expose value
 
-**Solutions:**
-
 ## ERROR: Include file not found
 
 **Category:** configuration
@@ -451,8 +413,6 @@ Referenced include file does not exist
 - Include path is incorrect
 - File was moved or deleted
 - Path resolution failed
-
-**Solutions:**
 
 ## ERROR: Include file parse error
 
@@ -465,8 +425,6 @@ Syntax error in included file
 - Invalid configuration structure
 - Encoding issues
 
-**Solutions:**
-
 ## ERROR: Include merge conflict
 
 **Category:** configuration
@@ -477,8 +435,6 @@ Cannot merge configurations from includes
 - Conflicting block definitions
 - Incompatible merge strategies
 - Duplicate keys with different values
-
-**Solutions:**
 
 ## ERROR: Include path traversal limit
 
@@ -491,8 +447,6 @@ Exceeded limit searching for include file
 - Traversal reached filesystem root
 - Fallback path not configured
 
-**Solutions:**
-
 ## ERROR: Interpolation error
 
 **Category:** configuration
@@ -503,8 +457,6 @@ Error in variable interpolation or template
 - Variable not defined
 - Invalid interpolation syntax
 - Circular reference in interpolation
-
-**Solutions:**
 
 ## ERROR: Invalid attribute value
 
@@ -517,8 +469,6 @@ Invalid or unsupported attribute in configuration
 - Attribute not supported for this block
 - Typo in attribute name
 
-**Solutions:**
-
 ## ERROR: Invalid configuration block
 
 **Category:** configuration
@@ -529,8 +479,6 @@ Invalid or unsupported block in terragrunt.hcl
 - Typo in block name
 - Block not supported in this version
 - Block in wrong location
-
-**Solutions:**
 
 ## ERROR: Invalid terraform source
 
@@ -543,8 +491,6 @@ The terraform source URL format is invalid
 - Unsupported source type
 - Missing required URL components
 
-**Solutions:**
-
 ## ERROR: Local evaluation error
 
 **Category:** configuration
@@ -555,8 +501,6 @@ Error evaluating local variable expression
 - Function call failed
 - Type error in expression
 - Null or undefined value
-
-**Solutions:**
 
 ## ERROR: Local type error
 
@@ -569,8 +513,6 @@ Local variable has wrong type
 - Type conversion failed
 - Collection type mismatch
 
-**Solutions:**
-
 ## ERROR: Locals merge error
 
 **Category:** configuration
@@ -581,8 +523,6 @@ Error merging locals from includes
 - Conflicting local definitions
 - Type incompatibility
 - Merge strategy not specified
-
-**Solutions:**
 
 ## ERROR: Missing required input variable
 
@@ -595,8 +535,6 @@ A required input variable is not provided
 - Variable not passed from parent terragrunt.hcl
 - Typo in variable name
 
-**Solutions:**
-
 ## ERROR: No Terraform configuration files found
 
 **Category:** configuration
@@ -608,7 +546,42 @@ Terragrunt cannot find any .tf files in the source directory
 - Terraform files are in a different directory
 - terraform.source is pointing to wrong location
 
+## ERROR: ParentFileNotFoundError on a file that sits beside the config
+
+**Category:** configuration
+
+`find_in_parent_folders` searches strictly *upward*. It starts at the parent of the referencing
+config and never looks in that config's own directory, so pointing it at a sibling traverses to
+the filesystem root and fails. The usual victim is `env.hcl` next to an environment's
+`terragrunt.stack.hcl`.
+
+```
+Call to function "find_in_parent_folders" failed: ParentFileNotFoundError: Could not find a
+env.hcl in any of the parent folders of .../dev/terragrunt.stack.hcl. Cause: Traversed all
+the way to the root..
+```
+
+**Likely causes:**
+- The target is a sibling of the referencing config, not an ancestor. `account.hcl` a
+  directory or two up is fine; `env.hcl` in the same directory is not.
+- The idiom was copied from a `root.hcl` include, where `find_in_parent_folders` is correct.
+- The file genuinely is missing, or is named differently from what was passed.
+
 **Solutions:**
+
+```hcl
+# Sibling: read it by relative path. A relative path resolves against the config file's own
+# directory, not the shell's cwd, so this holds whether the command runs from that directory
+# or from the repo root.
+locals {
+  env = read_terragrunt_config("env.hcl")
+}
+
+# Equivalent and more explicit, if you prefer an absolute path:
+#   env = read_terragrunt_config("${get_terragrunt_dir()}/env.hcl")
+```
+
+Verified against terragrunt 1.1.3 on 2026-08-20.
 
 ## ERROR: Remote state configuration missing
 
@@ -621,8 +594,6 @@ Remote state backend is not configured
 - Backend type not specified
 - Configuration incomplete
 
-**Solutions:**
-
 ## ERROR: Required attribute missing
 
 **Category:** configuration
@@ -633,8 +604,6 @@ Required configuration attribute is not provided
 - Mandatory attribute not specified
 - Attribute removed in refactoring
 - Version upgrade changed requirements
-
-**Solutions:**
 
 ## ERROR: Syntax error in configuration
 
@@ -647,8 +616,6 @@ HCL syntax error in terragrunt.hcl or .tf files
 - Invalid HCL syntax
 - Incorrect block structure
 
-**Solutions:**
-
 ## ERROR: Type mismatch error
 
 **Category:** configuration
@@ -659,8 +626,6 @@ Value type does not match expected type
 - String provided where number expected
 - Incorrect collection type
 - Type conversion failed
-
-**Solutions:**
 
 ## ERROR: Undefined local reference
 
@@ -673,8 +638,6 @@ Referenced local variable is not defined
 - Typo in local variable name
 - Local defined in different scope
 
-**Solutions:**
-
 ## ERROR: Working directory error
 
 **Category:** configuration
@@ -685,8 +648,6 @@ Cannot access or change to working directory
 - Directory does not exist
 - Insufficient permissions
 - Path is not a directory
-
-**Solutions:**
 
 ## ERROR: Circular dependency detected
 
@@ -699,8 +660,6 @@ Modules have circular dependencies which Terraform cannot resolve
 - Indirect circular dependency through multiple modules
 - Output references create circular dependency
 
-**Solutions:**
-
 ## ERROR: Circular module source reference
 
 **Category:** dependency
@@ -711,8 +670,6 @@ Module source creates a circular reference
 - Module source points to itself
 - Indirect circular reference through includes
 - Parent module depends on child
-
-**Solutions:**
 
 ## ERROR: Could not download source
 
@@ -725,8 +682,6 @@ Failed to download module source code
 - Invalid or inaccessible URL
 - Authentication required but not provided
 
-**Solutions:**
-
 ## ERROR: Git authentication failed
 
 **Category:** dependency
@@ -737,8 +692,6 @@ Failed to authenticate with Git repository
 - SSH key not configured
 - Git credentials expired or invalid
 - Repository requires authentication
-
-**Solutions:**
 
 ## ERROR: Git ref not found
 
@@ -751,8 +704,6 @@ Specified Git tag or branch does not exist
 - Tag/branch was deleted
 - Typo in ref parameter
 
-**Solutions:**
-
 ## ERROR: Local module path invalid
 
 **Category:** dependency
@@ -764,8 +715,6 @@ Local module path is invalid or inaccessible
 - Module directory moved or deleted
 - Path traversal issues
 
-**Solutions:**
-
 ## ERROR: Module archive extraction error
 
 **Category:** dependency
@@ -776,8 +725,6 @@ Failed to extract module archive
 - Corrupted download
 - Unsupported archive format
 - Insufficient disk space
-
-**Solutions:**
 
 ## ERROR: Module cache corrupted
 
@@ -807,8 +754,6 @@ Downloaded module checksum does not match expected value
 - Network corruption during download
 - Lock file out of sync
 
-**Solutions:**
-
 ## ERROR: Module not found
 
 **Category:** dependency
@@ -819,8 +764,6 @@ Terragrunt cannot locate a referenced module
 - Module path is incorrect
 - Module does not exist at specified location
 - Git repository or URL is inaccessible
-
-**Solutions:**
 
 ## ERROR: Module registry unavailable
 
@@ -833,8 +776,6 @@ Cannot access Terraform module registry
 - Registry is down
 - Firewall blocking registry access
 
-**Solutions:**
-
 ## ERROR: Module subdirectory not found
 
 **Category:** dependency
@@ -845,8 +786,6 @@ Specified subdirectory does not exist in module source
 - Subdirectory path is incorrect
 - Path changed in module version
 - Double slashes in path
-
-**Solutions:**
 
 ## ERROR: Module version not found
 
@@ -859,8 +798,6 @@ No module version matches the specified constraint
 - Requested version does not exist
 - Module has no published versions
 
-**Solutions:**
-
 ## ERROR: Connection refused
 
 **Category:** network
@@ -872,8 +809,6 @@ Cannot establish connection to remote service
 - Wrong host or port
 - Firewall blocking connection
 
-**Solutions:**
-
 ## ERROR: Network timeout
 
 **Category:** network
@@ -884,8 +819,6 @@ Network operation timed out
 - Network connectivity issues
 - Firewall blocking connection
 - Service endpoint is slow or unavailable
-
-**Solutions:**
 
 ## ERROR: Backend configuration changed
 
