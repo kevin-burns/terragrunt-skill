@@ -1,7 +1,19 @@
 # Terragrunt Error Diagnosis Playbook
 
-> Source: curated data harvested from omattsson/terragrunt-mcp-server, restructured for grep-based lookup.
-> Content spot-checked against docs.terragrunt.com at **v1.1.0** (2026-07-01) and updated for **v1.1.1** (2026-07-14). Flag and avoid any pre-1.0 idioms.
+> **Provenance, measured 2026-08-20 rather than asserted.** 66 of these 69 entries were
+> harvested at import from omattsson/terragrunt-mcp-server — a repo whose last commit is
+> 2026-02-22, five weeks before Terragrunt v1.0.0 existed. Three were written here
+> (both Azure entries, and `ParentFileNotFoundError`, which was reproduced on 1.1.3).
+> Seven have since been rewritten against the 1.1.3 binary and a dated docs snapshot.
+>
+> **What that means for you.** Every entry names likely causes. **Only 17 carry a fix**, and an
+> entry with no `**Solutions:**` section has none to give — say so rather than improvising one.
+> An entry carrying a "Verified against terragrunt 1.1.3" line was checked against the binary
+> on that date; the rest were not, and may describe a pre-1.0 world. Flag and avoid pre-1.0
+> idioms wherever they appear.
+>
+> Refining an entry means: reproduce the error, paste what the tool actually printed, and give
+> the command that fixes it on a current build. Not paraphrase the cause more fluently.
 
 Workflow: take the error text, grep this file for distinctive keywords (`grep -in 'state lock' error-patterns.md`), then read the matching ERROR section.
 
@@ -25,7 +37,6 @@ cause.
 - **terraform** (3): Terraform version constraint not met, Provider not found, Provider version constraint
 
 ## ERROR: AWS credentials not found
-
 **Category:** authentication
 
 AWS credentials are not configured or invalid
@@ -42,7 +53,6 @@ aws configure
 ```
 
 ## ERROR: Azure authentication required
-
 **Category:** authentication
 
 Not authenticated to Azure or subscription not accessible
@@ -62,7 +72,6 @@ az account set --subscription <subscription-id>
 ```
 
 ## ERROR: GCP credentials not found
-
 **Category:** authentication
 
 GCP credentials are not configured
@@ -79,7 +88,6 @@ gcloud auth application-default login
 ```
 
 ## ERROR: Access denied to backend
-
 **Category:** backend
 
 Insufficient permissions to access the backend storage
@@ -98,7 +106,6 @@ Insufficient permissions to access the backend storage
 - For Azure specifics, see "Azure backend 403" below and references/azure-backend.md.
 
 ## ERROR: Azure storage account not found
-
 **Category:** backend
 
 The Azure storage account for remote state does not exist
@@ -124,7 +131,6 @@ az storage container create -n <container> --account-name <account-name> --auth-
 ```
 
 ## ERROR: Azure backend 403 (AuthorizationFailure / shared key access disabled)
-
 **Category:** backend
 
 `init` against the azurerm backend fails with 403 (Forbidden) / AuthorizationFailure
@@ -147,7 +153,6 @@ az role assignment create --assignee <objectId> \
 - Allow up to ~10 min (30 at MG scope) for the role assignment to propagate.
 
 ## ERROR: azurerm provider requires subscription_id (v4+)
-
 **Category:** provider
 
 `azurerm` provider v4+ errors that the subscription ID is required
@@ -161,41 +166,69 @@ az role assignment create --assignee <objectId> \
 - Pin the provider in `required_providers` so the behavior is predictable.
 
 ## ERROR: GCS bucket not found
-
 **Category:** backend
 
-The GCS bucket for remote state does not exist
+`init` fails because the GCS bucket named in `remote_state` is not there.
 
 **Likely causes:**
-- Bucket name is incorrect
-- Bucket does not exist in the project
-- Wrong GCP project selected
+- Bucket name is wrong, or it lives in a different project.
+- The active project is not the one you think. The `google` provider has **no required
+  `project` argument**, so an unset value falls through to `GOOGLE_PROJECT`, then ADC, then
+  whatever `gcloud config set project` last selected. See references/hcl-blocks.md.
+- **You expected Terragrunt to create it.** `--backend-bootstrap` defaults to `false`.
+  `gcs` is one of the two backends that *can* be bootstrapped, but not by default.
 
 **Solutions:**
 
 ```bash
-gsutil ls gs://<bucket-name>
+# Which project is actually active, and does the bucket exist in it?
+gcloud config get-value project
+gcloud storage buckets describe gs://<bucket-name>
+
+# Create it through Terragrunt rather than by hand:
+terragrunt backend bootstrap
 ```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: S3 bucket does not exist
-
 **Category:** backend
 
-The S3 bucket specified for remote state does not exist
+`init` fails because the S3 bucket named in `remote_state` is not there.
 
 **Likely causes:**
-- Bucket name is incorrect
-- Bucket does not exist in the specified region
-- Bucket was deleted
+- Bucket name or region is wrong, or the bucket was deleted.
+- **You expected Terragrunt to create it. By default it does not.**
+  `--backend-bootstrap` defaults to **`false`**, so Terragrunt creates no backend resources
+  and OpenTofu/Terraform's own `init` fails with "bucket not found". This is the cause that
+  looks like the other three and is not.
+- `disable_init = true` in the `remote_state` block. Then nothing is created regardless of
+  `--backend-bootstrap`, and init still tries to reach the bucket.
 
 **Solutions:**
 
 ```bash
-aws s3 ls s3://<bucket-name>
+# Does it exist at all, and are you the principal you think you are?
+aws s3api head-bucket --bucket <bucket-name>
+aws sts get-caller-identity
+
+# Let Terragrunt create it -- explicitly, once:
+terragrunt backend bootstrap
+
+# ...or per-run, which also verifies the config of a bucket that already exists:
+terragrunt run --backend-bootstrap -- init
 ```
 
-## ERROR: After apply hook failed
+Only the **`s3` and `gcs`** backends support automatic creation. `azurerm` does not — see
+"Azure storage account not found".
 
+For S3 specifically, Terragrunt will also *update* an existing bucket to match the
+`remote_state` block (versioning, for example), which is why bootstrap is worth running against
+a bucket that already exists.
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
+
+## ERROR: After apply hook failed
 **Category:** configuration
 
 After apply hook execution failed
@@ -206,7 +239,6 @@ After apply hook execution failed
 - Notification service unreachable
 
 ## ERROR: Before init hook failed
-
 **Category:** configuration
 
 Before init hook execution failed
@@ -217,7 +249,6 @@ Before init hook execution failed
 - Environment not ready
 
 ## ERROR: Circular dependency in locals
-
 **Category:** configuration
 
 Local variables have circular dependencies
@@ -228,7 +259,6 @@ Local variables have circular dependencies
 - Self-referencing local
 
 ## ERROR: Circular include detected
-
 **Category:** configuration
 
 Include files create a circular reference
@@ -239,7 +269,6 @@ Include files create a circular reference
 - Self-referencing include
 
 ## ERROR: Configuration path not found
-
 **Category:** configuration
 
 Referenced file or directory does not exist
@@ -250,7 +279,6 @@ Referenced file or directory does not exist
 - Relative path resolved incorrectly
 
 ## ERROR: Duplicate configuration block
-
 **Category:** configuration
 
 Configuration block defined multiple times
@@ -261,7 +289,6 @@ Configuration block defined multiple times
 - Merged includes have duplicate blocks
 
 ## ERROR: Function evaluation error
-
 **Category:** configuration
 
 Error evaluating Terragrunt function
@@ -272,7 +299,6 @@ Error evaluating Terragrunt function
 - Runtime error in function execution
 
 ## ERROR: Generate if_exists strategy error
-
 **Category:** configuration
 
 Invalid if_exists strategy in generate block
@@ -283,7 +309,6 @@ Invalid if_exists strategy in generate block
 - Typo in strategy name
 
 ## ERROR: Generate invalid path
-
 **Category:** configuration
 
 Generated file path is invalid
@@ -294,7 +319,6 @@ Generated file path is invalid
 - Absolute path not allowed
 
 ## ERROR: Generate permission denied
-
 **Category:** configuration
 
 Insufficient permissions to write generated file
@@ -305,7 +329,6 @@ Insufficient permissions to write generated file
 - SELinux or security policy blocking
 
 ## ERROR: Generate template error
-
 **Category:** configuration
 
 Error in generate block template
@@ -316,7 +339,6 @@ Error in generate block template
 - Function error in contents
 
 ## ERROR: Generated file already exists
-
 **Category:** configuration
 
 Generated file already exists and cannot be overwritten
@@ -327,7 +349,6 @@ Generated file already exists and cannot be overwritten
 - Multiple generates target same file
 
 ## ERROR: Hook command failed
-
 **Category:** configuration
 
 Before or after hook command failed
@@ -338,7 +359,6 @@ Before or after hook command failed
 - Insufficient permissions
 
 ## ERROR: Hook environment variable missing
-
 **Category:** configuration
 
 Required environment variable for hook is missing
@@ -349,7 +369,6 @@ Required environment variable for hook is missing
 - Shell context different
 
 ## ERROR: Hook execution timeout
-
 **Category:** configuration
 
 Hook command exceeded timeout
@@ -360,7 +379,6 @@ Hook command exceeded timeout
 - Timeout value too low
 
 ## ERROR: Hook log suppression error
-
 **Category:** configuration
 
 Error with hook log suppression configuration
@@ -371,7 +389,6 @@ Error with hook log suppression configuration
 - Output redirection failed
 
 ## ERROR: Hook working directory error
-
 **Category:** configuration
 
 Cannot access hook working directory
@@ -382,7 +399,6 @@ Cannot access hook working directory
 - Path resolution failed
 
 ## ERROR: Include dependency resolution error
-
 **Category:** configuration
 
 Cannot resolve dependencies in included configuration
@@ -393,7 +409,6 @@ Cannot resolve dependencies in included configuration
 - Dependency execution order wrong
 
 ## ERROR: Include expose configuration conflict
-
 **Category:** configuration
 
 Conflict in include expose configuration
@@ -404,7 +419,6 @@ Conflict in include expose configuration
 - Invalid expose value
 
 ## ERROR: Include file not found
-
 **Category:** configuration
 
 Referenced include file does not exist
@@ -415,7 +429,6 @@ Referenced include file does not exist
 - Path resolution failed
 
 ## ERROR: Include file parse error
-
 **Category:** configuration
 
 Syntax error in included file
@@ -426,7 +439,6 @@ Syntax error in included file
 - Encoding issues
 
 ## ERROR: Include merge conflict
-
 **Category:** configuration
 
 Cannot merge configurations from includes
@@ -437,7 +449,6 @@ Cannot merge configurations from includes
 - Duplicate keys with different values
 
 ## ERROR: Include path traversal limit
-
 **Category:** configuration
 
 Exceeded limit searching for include file
@@ -448,7 +459,6 @@ Exceeded limit searching for include file
 - Fallback path not configured
 
 ## ERROR: Interpolation error
-
 **Category:** configuration
 
 Error in variable interpolation or template
@@ -459,7 +469,6 @@ Error in variable interpolation or template
 - Circular reference in interpolation
 
 ## ERROR: Invalid attribute value
-
 **Category:** configuration
 
 Invalid or unsupported attribute in configuration
@@ -470,7 +479,6 @@ Invalid or unsupported attribute in configuration
 - Typo in attribute name
 
 ## ERROR: Invalid configuration block
-
 **Category:** configuration
 
 Invalid or unsupported block in terragrunt.hcl
@@ -481,7 +489,6 @@ Invalid or unsupported block in terragrunt.hcl
 - Block in wrong location
 
 ## ERROR: Invalid terraform source
-
 **Category:** configuration
 
 The terraform source URL format is invalid
@@ -492,7 +499,6 @@ The terraform source URL format is invalid
 - Missing required URL components
 
 ## ERROR: Local evaluation error
-
 **Category:** configuration
 
 Error evaluating local variable expression
@@ -503,7 +509,6 @@ Error evaluating local variable expression
 - Null or undefined value
 
 ## ERROR: Local type error
-
 **Category:** configuration
 
 Local variable has wrong type
@@ -514,7 +519,6 @@ Local variable has wrong type
 - Collection type mismatch
 
 ## ERROR: Locals merge error
-
 **Category:** configuration
 
 Error merging locals from includes
@@ -525,7 +529,6 @@ Error merging locals from includes
 - Merge strategy not specified
 
 ## ERROR: Missing required input variable
-
 **Category:** configuration
 
 A required input variable is not provided
@@ -536,7 +539,6 @@ A required input variable is not provided
 - Typo in variable name
 
 ## ERROR: No Terraform configuration files found
-
 **Category:** configuration
 
 Terragrunt cannot find any .tf files in the source directory
@@ -547,7 +549,6 @@ Terragrunt cannot find any .tf files in the source directory
 - terraform.source is pointing to wrong location
 
 ## ERROR: ParentFileNotFoundError on a file that sits beside the config
-
 **Category:** configuration
 
 `find_in_parent_folders` searches strictly *upward*. It starts at the parent of the referencing
@@ -584,7 +585,6 @@ locals {
 Verified against terragrunt 1.1.3 on 2026-08-20.
 
 ## ERROR: Remote state configuration missing
-
 **Category:** configuration
 
 Remote state backend is not configured
@@ -595,7 +595,6 @@ Remote state backend is not configured
 - Configuration incomplete
 
 ## ERROR: Required attribute missing
-
 **Category:** configuration
 
 Required configuration attribute is not provided
@@ -606,7 +605,6 @@ Required configuration attribute is not provided
 - Version upgrade changed requirements
 
 ## ERROR: Syntax error in configuration
-
 **Category:** configuration
 
 HCL syntax error in terragrunt.hcl or .tf files
@@ -617,7 +615,6 @@ HCL syntax error in terragrunt.hcl or .tf files
 - Incorrect block structure
 
 ## ERROR: Type mismatch error
-
 **Category:** configuration
 
 Value type does not match expected type
@@ -628,7 +625,6 @@ Value type does not match expected type
 - Type conversion failed
 
 ## ERROR: Undefined local reference
-
 **Category:** configuration
 
 Referenced local variable is not defined
@@ -639,7 +635,6 @@ Referenced local variable is not defined
 - Local defined in different scope
 
 ## ERROR: Working directory error
-
 **Category:** configuration
 
 Cannot access or change to working directory
@@ -650,7 +645,6 @@ Cannot access or change to working directory
 - Path is not a directory
 
 ## ERROR: Circular dependency detected
-
 **Category:** dependency
 
 Modules have circular dependencies which Terraform cannot resolve
@@ -661,7 +655,6 @@ Modules have circular dependencies which Terraform cannot resolve
 - Output references create circular dependency
 
 ## ERROR: Circular module source reference
-
 **Category:** dependency
 
 Module source creates a circular reference
@@ -672,7 +665,6 @@ Module source creates a circular reference
 - Parent module depends on child
 
 ## ERROR: Could not download source
-
 **Category:** dependency
 
 Failed to download module source code
@@ -683,7 +675,6 @@ Failed to download module source code
 - Authentication required but not provided
 
 ## ERROR: Git authentication failed
-
 **Category:** dependency
 
 Failed to authenticate with Git repository
@@ -694,7 +685,6 @@ Failed to authenticate with Git repository
 - Repository requires authentication
 
 ## ERROR: Git ref not found
-
 **Category:** dependency
 
 Specified Git tag or branch does not exist
@@ -705,7 +695,6 @@ Specified Git tag or branch does not exist
 - Typo in ref parameter
 
 ## ERROR: Local module path invalid
-
 **Category:** dependency
 
 Local module path is invalid or inaccessible
@@ -716,7 +705,6 @@ Local module path is invalid or inaccessible
 - Path traversal issues
 
 ## ERROR: Module archive extraction error
-
 **Category:** dependency
 
 Failed to extract module archive
@@ -730,21 +718,36 @@ Failed to extract module archive
 
 **Category:** dependency
 
-Module cache is corrupted
+A half-written or unreadable `.terragrunt-cache` makes a module fail to load, most often as a
+checksum or "failed to open zip archive" error rather than anything naming the cache.
+
+**There is no `terragrunt clear-cache` command.** It was removed in the 1.0 CLI redesign and
+1.1.3 answers it with `unknown command: "clear-cache". Terragrunt no longer forwards unknown
+commands by default.` The cache is scratch space on disk; you delete it yourself.
 
 **Likely causes:**
-- Incomplete download
-- Disk corruption
-- Cache directory permissions
+- A run killed part-way through a download.
+- Two concurrent runs staging the same provider. **Fixed in v1.1.3** — before it, the first
+  run to finish could delete an archive the other was still unpacking. If you are below
+  1.1.3 and see this on a parallel CI matrix, upgrading is the fix, not clearing the cache.
+- Cache directory permissions, or a full disk.
 
 **Solutions:**
 
 ```bash
-terragrunt clear-cache
+# Look before you delete -- run --all can leave a lot of these:
+find . -type d -name ".terragrunt-cache"
+
+# Then remove them. Terragrunt recreates the cache as needed.
+find . -type d -name ".terragrunt-cache" -prune -exec rm -rf {} +
 ```
 
-## ERROR: Module checksum mismatch
+Set `TG_DOWNLOAD_DIR` to move the cache somewhere outside the working tree if you would rather
+not have these scattered through the repo.
 
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
+
+## ERROR: Module checksum mismatch
 **Category:** dependency
 
 Downloaded module checksum does not match expected value
@@ -755,7 +758,6 @@ Downloaded module checksum does not match expected value
 - Lock file out of sync
 
 ## ERROR: Module not found
-
 **Category:** dependency
 
 Terragrunt cannot locate a referenced module
@@ -766,7 +768,6 @@ Terragrunt cannot locate a referenced module
 - Git repository or URL is inaccessible
 
 ## ERROR: Module registry unavailable
-
 **Category:** dependency
 
 Cannot access Terraform module registry
@@ -777,7 +778,6 @@ Cannot access Terraform module registry
 - Firewall blocking registry access
 
 ## ERROR: Module subdirectory not found
-
 **Category:** dependency
 
 Specified subdirectory does not exist in module source
@@ -788,7 +788,6 @@ Specified subdirectory does not exist in module source
 - Double slashes in path
 
 ## ERROR: Module version not found
-
 **Category:** dependency
 
 No module version matches the specified constraint
@@ -799,7 +798,6 @@ No module version matches the specified constraint
 - Module has no published versions
 
 ## ERROR: Connection refused
-
 **Category:** network
 
 Cannot establish connection to remote service
@@ -810,7 +808,6 @@ Cannot establish connection to remote service
 - Firewall blocking connection
 
 ## ERROR: Network timeout
-
 **Category:** network
 
 Network operation timed out
@@ -821,67 +818,118 @@ Network operation timed out
 - Service endpoint is slow or unavailable
 
 ## ERROR: Backend configuration changed
-
 **Category:** state
 
-The backend configuration has changed and state needs to be migrated
+OpenTofu/Terraform detects that the backend block no longer matches the one recorded in
+`.terraform/terraform.tfstate`, and refuses to continue until told which way to resolve it.
+
+**The two flags do opposite things and one of them loses state. Pick deliberately.**
+
+- `-reconfigure` — **discard** the local backend record and start fresh against the new
+  backend. Existing state in the OLD location stays where it is; the new location starts
+  empty. Right when the old state was a mistake or is already gone.
+- `-migrate-state` — **copy** the state from the old backend to the new one. Right when the
+  state is real and you are moving it.
 
 **Likely causes:**
-- Backend bucket/container changed
-- Backend region changed
-- Backend configuration was modified
+- Bucket, container, key or region changed in `remote_state`.
+- A `key` derived from `path_relative_to_include()` moved because a unit was renamed or a
+  directory was restructured. This is the common one and it looks like a config change
+  because it is.
+- Switching a unit between `dynamodb_table` and `use_lockfile`.
 
 **Solutions:**
 
 ```bash
+# Moving real state to a new location:
+terragrunt init -migrate-state
+
+# Repointing at a new backend and abandoning the old record:
 terragrunt init -reconfigure
 ```
+
+For moving state **between units** rather than between backends, 1.x has a first-class
+command that does not go through `init` at all:
+
 ```bash
-terragrunt init -migrate-state
+terragrunt backend migrate <src-unit> <dst-unit>
+# --force is required if the destination bucket is not versioned
 ```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Error acquiring state lock
-
 **Category:** state
 
-Unable to acquire state lock, usually because another process has it
+Another process holds the lock, or a crashed one never released it.
+
+**The remediation depends on which locking mechanism you are using, and there are two.**
+Check the `remote_state` block before doing anything:
+
+- `dynamodb_table = "..."` — the classic S3 + DynamoDB lock table. The lock is a row in that
+  table.
+- `use_lockfile = true` — **native S3 locking** via conditional writes. No DynamoDB table
+  exists; the lock is an object beside the state file. Requires OpenTofu/Terraform **1.10+**.
+
+An entry that assumes a lock table will send you hunting for one that was never created.
 
 **Likely causes:**
-- Another Terragrunt/Terraform process is running
-- Previous process crashed without releasing lock
-- Lock file was not cleaned up properly
+- A concurrent run — most often a `run --all` in CI overlapping with a local run.
+- A previous process killed before it released the lock.
+- Read access to the state but not write access to the lock, which surfaces here rather than
+  as a permissions error.
 
 **Solutions:**
 
 ```bash
+# The lock ID is printed in the error. Run this in the unit that is stuck:
 terragrunt force-unlock <LOCK_ID>
+
+# Verify nothing is actually still running first. With DynamoDB locking:
+aws dynamodb scan --table-name <lock-table> --max-items 5
+
+# With use_lockfile, the lock is an object next to the state:
+aws s3 ls s3://<bucket>/<key>.tflock
 ```
+
+`force-unlock` is a shortcut for `terragrunt run -- force-unlock`, so it takes the same
+`--working-dir` / `--config` flags as any other run. **Do not force-unlock a lock a live apply
+still holds** — that is how two applies end up writing one state file.
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Failed to get existing workspaces
-
 **Category:** state
 
-Cannot retrieve or access Terraform workspace
+`init` cannot list workspaces from the backend.
+
+**This is usually not a workspace problem.** Listing workspaces is the first thing that talks
+to the backend, so a credential, permission or bucket problem surfaces with this wording
+before anything mentions S3 or storage. Read it as "the backend did not answer" and check the
+backend entries in this file first.
 
 **Likely causes:**
-- Backend is not properly initialized
-- Workspace does not exist
-- Backend credentials are invalid
+- The backend does not exist yet, or the principal cannot list it (S3 `ListBucket`, GCS
+  `storage.objects.list`, Azure data-plane RBAC).
+- Credentials expired mid-session — common with short-lived SSO or assumed roles.
+- The workspace genuinely does not exist, which is the least likely of these.
 
 **Solutions:**
 
 ```bash
+# Confirm who you are before blaming the config:
+aws sts get-caller-identity      # or: az account show / gcloud auth list
+
 terragrunt init
-```
-```bash
 terragrunt workspace list
 ```
-```bash
-terragrunt workspace new <name>
-```
+
+If the backend itself is missing, see "S3 bucket does not exist" / "GCS bucket not found" —
+Terragrunt does not create it by default.
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Provider not found
-
 **Category:** terraform
 
 Required Terraform provider is not installed
@@ -898,7 +946,6 @@ terragrunt init
 ```
 
 ## ERROR: Provider version constraint
-
 **Category:** terraform
 
 Provider version does not meet requirements
@@ -915,7 +962,6 @@ terragrunt init -upgrade
 ```
 
 ## ERROR: Terraform version constraint not met
-
 **Category:** terraform
 
 The installed Terraform version does not meet requirements
