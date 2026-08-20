@@ -1,0 +1,2 @@
+I created an S3 bucket by hand in the console last year and now I want it under Terraform.
+What's the command to bring an existing resource into state?

@@ -1,0 +1,2 @@
+I've got a single Terraform config in one directory that manages a handful of resources for one
+environment. It's about 200 lines and one person works on it. Should I adopt Terragrunt?

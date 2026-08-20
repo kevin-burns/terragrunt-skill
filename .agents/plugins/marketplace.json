@@ -1,0 +1,19 @@
+{
+  "name": "terragrunt-skill",
+  "interface": {
+    "displayName": "Terragrunt"
+  },
+  "plugins": [
+    {
+      "name": "terragrunt-skill",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

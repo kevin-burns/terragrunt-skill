@@ -1,0 +1,3 @@
+Half our units are passing inputs the underlying module doesn't declare, and we only find out
+when apply fails. Is there a way to get Terragrunt to check that the inputs I'm passing
+actually match the module's variables, before I run anything?

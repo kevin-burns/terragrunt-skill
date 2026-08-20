@@ -1,0 +1,2 @@
+My team keeps committing HCL with inconsistent indentation. What Terragrunt command formats
+every .hcl file in the repo, and how do I wire it into a pre-commit hook so CI stays clean?

@@ -1,0 +1,14 @@
+{
+  "name": "terragrunt-skill",
+  "version": "1.0.0",
+  "description": "Generate, validate, review and debug Terragrunt 1.x configurations across AWS, Azure and GCP. A grep-first reference set that reads the installed terragrunt version rather than asserting one, with templates for root, stack, unit, catalog and provider config.",
+  "author": {
+    "name": "Kevin Burns",
+    "url": "https://github.com/kevin-burns"
+  },
+  "homepage": "https://github.com/kevin-burns/terragrunt-skill",
+  "license": "MIT",
+  "skills": [
+    "./terragrunt-skill"
+  ]
+}

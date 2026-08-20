@@ -1,0 +1,3 @@
+I'm setting up a new Terragrunt repo. Each child config under live/ needs to inherit the
+backend and provider settings from a config at the top of the tree. Show me what goes in the
+child's include block.

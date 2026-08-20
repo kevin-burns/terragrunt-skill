@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2752" height="1536" viewBox="0 0 2752 1536">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="18" stdDeviation="26" flood-color="#0b0d12" flood-opacity="0.22"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 1 1 L 11 6 L 1 11 z" fill="#4F92C6"/>
+    </marker>
+    <marker id="arrowg" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 1 1 L 11 6 L 1 11 z" fill="#8A8B92"/>
+    </marker>
+  </defs>
+
+  <rect width="2752" height="1536" fill="#FFFFFF"/>
+
+  <rect x="190" y="150" width="2372" height="1204" rx="30" fill="#12151D" filter="url(#shadow)"/>
+  <circle cx="252" cy="218" r="18" fill="#FF6159"/>
+  <circle cx="324" cy="218" r="18" fill="#FEB93F"/>
+  <circle cx="396" cy="218" r="18" fill="#3EC252"/>
+  <text x="1376" y="234" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="40" font-weight="700" fill="#8A8B92">terragrunt-skill — a question, then a layout that runs on 1.x</text>
+
+  <g transform="translate(0,-26)">
+  <!-- ================= LEFT: the diagram ================= -->
+  <g fill="none" stroke="#4F92C6" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M 282 654 L 442 654 L 522 734 L 522 1014 L 282 1014 Z"/>
+    <path d="M 442 654 L 442 734 L 522 734"/>
+    <line x1="322" y1="874" x2="482" y2="874"/>
+    <line x1="322" y1="924" x2="482" y2="924"/>
+    <line x1="322" y1="974" x2="412" y2="974"/>
+  </g>
+  <rect x="314" y="772" width="150" height="58" rx="10" fill="#1A2028" stroke="#71BD86" stroke-width="5" stroke-dasharray="14 10"/>
+  <rect x="284" y="956" width="120" height="60" rx="10" fill="#4F92C6"/>
+  <text x="344" y="999" text-anchor="middle" font-family="Menlo, DejaVu Sans Mono, monospace"
+        font-size="34" font-weight="700" fill="#12151D">HCL</text>
+
+  <path d="M 392 764 C 430 660 510 606 578 596" fill="none" stroke="#8A8B92" stroke-width="6" marker-end="url(#arrowg)"/>
+  <rect x="590" y="548" width="236" height="80" rx="12" fill="#1A2028" stroke="#8A8B92" stroke-width="5" stroke-dasharray="14 10"/>
+  <text x="708" y="601" text-anchor="middle" font-family="Menlo, DejaVu Sans Mono, monospace"
+        font-size="36" fill="#D4D8DD">run-all</text>
+  <text x="862" y="602" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="36" fill="#8A8B92">pre-1.0</text>
+  <g stroke="#FF6159" stroke-width="7" stroke-linecap="round">
+    <line x1="689" y1="656" x2="727" y2="694"/>
+    <line x1="727" y1="656" x2="689" y2="694"/>
+  </g>
+
+  <line x1="540" y1="834" x2="588" y2="834" stroke="#4F92C6" stroke-width="16"/>
+  <circle cx="648" cy="834" r="38" fill="none" stroke="#3EC252" stroke-width="7"/>
+  <path d="M 628 834 L 642 850 L 670 818" fill="none" stroke="#3EC252" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="692" y1="834" x2="792" y2="834" stroke="#4F92C6" stroke-width="16" marker-end="url(#arrow)"/>
+
+  <rect x="854" y="662" width="440" height="352" rx="14" fill="none" stroke="#4F92C6" stroke-width="7"/>
+  <line x1="854" y1="724" x2="1294" y2="724" stroke="#4F92C6" stroke-width="7"/>
+  <circle cx="882" cy="693" r="8" fill="#4F92C6"/>
+  <circle cx="908" cy="693" r="8" fill="#4F92C6"/>
+  <circle cx="934" cy="693" r="8" fill="#4F92C6"/>
+  <g font-family="Menlo, DejaVu Sans Mono, monospace" font-size="26" fill="#D4D8DD">
+    <text x="886" y="788">root.hcl</text>
+    <text x="922" y="848">prod/</text>
+    <text x="954" y="908">terragrunt.stack.hcl</text>
+    <text x="922" y="968">dev/</text>
+  </g>
+  <g stroke="#4F92C6" stroke-width="4" fill="none" opacity="0.7" stroke-linecap="round">
+    <path d="M 900 802 L 900 840 L 914 840"/>
+    <path d="M 900 840 L 900 960 L 914 960"/>
+    <path d="M 936 862 L 936 900 L 948 900"/>
+  </g>
+
+  <!-- ================= RIGHT: wordmark, claim, real output ================= -->
+  <text x="1330" y="560" font-family="Menlo, DejaVu Sans Mono, monospace" font-size="118" font-weight="700">
+    <tspan fill="#4D94C9">terragrunt</tspan><tspan fill="#FFFFFF">-skill</tspan>
+  </text>
+  <text x="1336" y="638" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="33" fill="#85898F">scaffolds the layout · never a pre-1.0 command · explains the error you pasted</text>
+
+  <text x="1336" y="806" xml:space="preserve" font-family="Menlo, DejaVu Sans Mono, monospace" font-size="46"><tspan fill="#71BD86">$ python3</tspan><tspan fill="#D4D8DD"> scripts/preflight.py</tspan></text>
+
+  <rect x="1330" y="856" width="1164" height="330" rx="16" fill="none" stroke="#262B34" stroke-width="4"/>
+  <g font-family="Menlo, DejaVu Sans Mono, monospace" font-size="34" xml:space="preserve">
+    <text x="1372" y="924"><tspan fill="#D4D8DD">terragrunt </tspan><tspan fill="#71BD86">{{VERSION}}</tspan></text>
+    <line x1="1372" y1="950" x2="2452" y2="950" stroke="#262B34" stroke-width="3"/>
+    <text x="1372" y="1006"><tspan fill="#71BD86">v1.1.0+</tspan><tspan fill="#D4D8DD">  autoinclude · unit.&lt;name&gt;.path · CAS</tspan></text>
+    <line x1="1372" y1="1032" x2="2452" y2="1032" stroke="#262B34" stroke-width="3"/>
+    <text x="1372" y="1088"><tspan fill="#71BD86">v1.1.1+</tspan><tspan fill="#D4D8DD">  oci:// sources   --experiment oci</tspan></text>
+    <line x1="1372" y1="1114" x2="2452" y2="1114" stroke="#262B34" stroke-width="3"/>
+    <text x="1372" y="1162"><tspan fill="#FEB93F">! {{HAZARD_VERSION}}</tspan><tspan fill="#85898F">  {{HAZARD_TEXT}}</tspan></text>
+  </g>
+  </g>
+</svg>

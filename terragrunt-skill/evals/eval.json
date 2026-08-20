@@ -1,0 +1,32 @@
+{
+  "skill_name": "terragrunt-skill",
+  "suite": "policy-compliance",
+  "question": "Terragrunt v1.0.0 (2026-03-30) renamed much of the CLI. SKILL.md's first hard policy bans every pre-1.0 form. Does stating the ban change what the model emits?",
+  "note": "Model-in-the-loop ablation, not a script eval. Run: uv run evals/build_arms.py && ./evals/matrix.sh && uv run evals/grade.py. Grading is by banned-form detection with a mandatory human adjudication step -- 'run-all was removed in 1.0' is correct behaviour and must not score as a violation. `uv run evals/grade.py --final` refuses to report until every hit has a verdict. Detection and classification are tested in tests/test_eval_grade.py.",
+  "arms": [
+    {"id": "C", "name": "control", "is": "empty; no system prompt appended", "isolates": "the null hypothesis -- the model unaided"},
+    {"id": "S", "name": "skill", "is": "the whole of SKILL.md", "isolates": "what ships"},
+    {"id": "P", "name": "policy-ablated", "is": "SKILL.md minus hard-policy item 1 only", "isolates": "everything the skill knows except the ban"}
+  ],
+  "design": {
+    "replicates": 3,
+    "replicates_rationale": "A between-arm gap is unreadable without knowing how much two runs of the same arm disagree. grade.py prints that noise floor beside every result.",
+    "third_arm_rationale": "C vs S alone cannot separate the ban from the surrounding 2,000 words of correct 1.x context. S-P isolates the ban; C-P isolates the rest.",
+    "no_json_schema": "A forced schema overrides output shape, and this suite grades the CLI and HCL actually emitted."
+  },
+  "cases": [
+    {"id": 1, "baits": "run-all / plan-all", "asks": "plan across thirty modules in one go"},
+    {"id": 2, "baits": "hclfmt", "asks": "format every .hcl in the repo, wire it into pre-commit"},
+    {"id": 3, "baits": "validate-inputs", "asks": "check passed inputs match the module's variables"},
+    {"id": 4, "baits": "bare find_in_parent_folders()", "asks": "child inherits backend and provider from the top of the tree"},
+    {"id": 5, "baits": "the skip attribute", "asks": "leave one unit out of a whole-tree run"},
+    {"id": 6, "baits": "retryable_errors", "asks": "retry transient AWS throttling in CI"},
+    {"id": 7, "baits": "--terragrunt-* flags", "asks": "point at a directory and a non-default config from CI"}
+  ],
+  "out_of_scope": [
+    "The ten reference files are NOT inlined -- the harness disallows Read and Grep, and the references total ~31,000 words. This bounds the effect of SKILL.md, where the hard policy lives. It says nothing about reference quality.",
+    "Not a correctness test. An answer can score clean and still be wrong.",
+    "Version gating (does the skill refuse a v1.1.0+ attribute for a repo pinned to <=1.0.x) is a separate suite.",
+    "Diagnosis accuracy needs a judge model and real error text; no cloud or backend is connected here. If built, must run offline against captured strings."
+  ]
+}

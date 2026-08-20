@@ -1,0 +1,2 @@
+Write me a Terraform module for an S3 bucket with versioning enabled, server-side encryption,
+and public access blocked. I want sensible variables and outputs.

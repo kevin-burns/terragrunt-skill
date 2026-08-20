@@ -1,0 +1,3 @@
+Our CI runs against AWS and we intermittently get ThrottlingException and "RequestError: send
+request failed" during init. It's transient — a rerun always works. Can Terragrunt retry those
+automatically instead of failing the pipeline? Show me the config.

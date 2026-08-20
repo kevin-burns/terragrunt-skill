@@ -1,0 +1,20 @@
+# Arms are built from SKILL.md and must be rebuilt whenever it moves (lesson 5).
+# Committing them guarantees a stale arm gets compared against a fresh one.
+arms/
+runs/
+
+# Harvested pages from docs.terragrunt.com and elsewhere, kept as a local cache so a
+# reference claim can be re-checked against what the docs actually said. The frontmatter
+# (source_url, retrieved_at, content_sha256) IS the citation; the body is third-party text
+# and this repo links and cites rather than republishing.
+snapshots/
+
+# Derived from runs/, which is ignored above, so committing it strands a grading result
+# whose inputs are not here. RESULTS.md and adjudications.json are the record that survives.
+hits.jsonl
+runs-*.tar.gz
+
+# Cross-model banks and their derived files. Same reasoning as runs/ above: regenerable, and
+# a bank committed once looks current forever. RESULTS.md carries what survives.
+runs-*/
+hits-*.jsonl
