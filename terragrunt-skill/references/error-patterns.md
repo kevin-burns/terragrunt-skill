@@ -4,9 +4,9 @@
 > harvested at import from omattsson/terragrunt-mcp-server — a repo whose last commit is
 > 2026-02-22, five weeks before Terragrunt v1.0.0 existed. Three were written here
 > (both Azure entries, and `ParentFileNotFoundError`, which was reproduced on 1.1.3).
-> Thirteen have since been rewritten against the 1.1.3 binary and a dated docs snapshot.
+> Twenty-five have since been rewritten against the 1.1.3 binary and a dated docs snapshot.
 >
-> **What that means for you.** Every entry names likely causes. **Only 24 carry a fix**, and an
+> **What that means for you.** Every entry names likely causes. **Only 36 carry a fix**, and an
 > entry with no `**Solutions:**` section has none to give — say so rather than improvising one.
 > An entry carrying a "Verified against terragrunt 1.1.3" line was checked against the binary
 > on that date; the rest were not, and may describe a pre-1.0 world. Flag and avoid pre-1.0
@@ -231,22 +231,72 @@ Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 ## ERROR: After apply hook failed
 **Category:** configuration
 
-After apply hook execution failed
+An `after_hook` returned non-zero. The apply already happened — the infrastructure change is
+done and only the hook failed.
+
+> **Hooks are nested inside the `terraform` block, not top level**, and `execute` takes a
+> **list**, not a string: `execute = ["echo", "Foo"]` runs `echo Foo`. A string is the most
+> common shape error and it does not read like one.
 
 **Likely causes:**
-- Post-deployment script error
-- Resources not yet available
-- Notification service unreachable
+- The hook assumes the apply succeeded. By default an `after_hook` **does not run** when the
+  command failed; if you set `run_on_error = true` to change that, the hook must cope with a
+  failed apply rather than assume outputs exist.
+- It reads `terragrunt output` for a value the apply did not create.
+- It writes somewhere the CI runner cannot.
+
+**Solutions:**
+
+```hcl
+terraform {
+  after_hook "notify" {
+    commands     = ["apply"]
+    execute      = ["${get_terragrunt_dir()}/scripts/notify.sh"]
+    run_on_error = true          # then handle failure inside the script
+  }
+}
+```
+
+Inside the script, `TG_CTX_COMMAND` tells you which subcommand ran and `TG_CTX_HOOK_NAME`
+which hook you are in — see "Hook environment variable missing".
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Before init hook failed
 **Category:** configuration
 
-Before init hook execution failed
+A `before_hook` returned non-zero, so Terragrunt stopped before running OpenTofu/Terraform.
+
+> **Hooks are nested inside the `terraform` block, not top level**, and `execute` takes a
+> **list**, not a string: `execute = ["echo", "Foo"]` runs `echo Foo`. A string is the most
+> common shape error and it does not read like one.
 
 **Likely causes:**
-- Initialization dependencies not met
-- Script path incorrect
-- Environment not ready
+- The script is not executable, or is not on `PATH`. `execute = ["hook.sh"]` needs `hook.sh`
+  resolvable **from the hook's working directory**, which is not necessarily where you think —
+  see "Hook working directory error".
+- `commands` does not list the subcommand you are running, so a hook you believed was tested
+  never ran until now.
+- The hook depends on something `init` was going to produce. A `before_hook` on `init` runs
+  before the module is downloaded.
+
+**Solutions:**
+
+```hcl
+terraform {
+  before_hook "check" {
+    commands = ["init", "plan", "apply"]   # a list of subcommands, not "all"
+    execute  = ["${get_terragrunt_dir()}/scripts/check.sh"]
+  }
+}
+```
+
+```bash
+# Run the hook exactly as Terragrunt would, from the module directory:
+terragrunt run -- init
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Circular dependency in locals
 **Category:** configuration
@@ -301,102 +351,353 @@ Error evaluating Terragrunt function
 ## ERROR: Generate if_exists strategy error
 **Category:** configuration
 
-Invalid if_exists strategy in generate block
+`if_exists` was given a value that is not one of the four Terragrunt accepts.
+
+| value | what it does |
+|---|---|
+| `overwrite` | replace the file whatever wrote it |
+| `overwrite_terragrunt` | replace it **only if Terragrunt generated it**; otherwise error |
+| `skip` | leave the existing file alone |
+| `error` | exit with an error |
+
+`overwrite_terragrunt` is the one to reach for by default: it refuses to clobber a file a human
+wrote, which is the failure mode `overwrite` has.
+
+**There is a second, separate attribute that is easy to confuse with it.** `if_disabled`
+controls what happens to an already-generated file when `disable = true`, and it takes a
+*different* set of values: `remove`, `remove_terragrunt`, `skip` (default `skip`).
 
 **Likely causes:**
-- Invalid strategy value
-- Strategy not applicable to situation
-- Typo in strategy name
+- A plausible-sounding value that does not exist — `replace`, `force`, `always`, `never`.
+- `if_disabled` values used on `if_exists` or the reverse.
+
+**Solutions:**
+
+```hcl
+generate "provider" {
+  path      = "provider.tf"
+  if_exists = "overwrite_terragrunt"
+  contents  = <<EOF
+provider "aws" {
+  region = "eu-central-1"
+}
+EOF
+}
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Generate invalid path
 **Category:** configuration
 
-Generated file path is invalid
+`path` does not resolve to somewhere Terragrunt can write.
+
+**`path` is relative to the OpenTofu/Terraform working directory, not to your config.** When
+`source` is remote that working directory is a temporary copy under `.terragrunt-cache`, so a
+path reaching outside it — `../shared/provider.tf` — points somewhere that will not survive,
+or does not exist.
 
 **Likely causes:**
-- Path contains invalid characters
-- Path traversal outside working directory
-- Absolute path not allowed
+- An absolute path, or one climbing out of the module directory with `..`.
+- A path with a directory component that does not exist. Terragrunt writes a file; it does not
+  create the tree above it.
+- Expecting the file to appear in the repo. It appears in the working directory, which for a
+  remote `source` is under `.terragrunt-cache`.
+
+**Solutions:**
+
+```hcl
+generate "backend" {
+  path      = "backend.tf"      # a bare filename is almost always right
+  if_exists = "overwrite_terragrunt"
+  contents  = "..."
+}
+```
+
+```bash
+# Where did it actually go?
+terragrunt render
+find . -path '*.terragrunt-cache*' -name 'backend.tf'
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Generate permission denied
 **Category:** configuration
 
-Insufficient permissions to write generated file
+Terragrunt could not write the generated file.
 
 **Likely causes:**
-- Directory is read-only
-- File ownership issue
-- SELinux or security policy blocking
+- The working directory is read-only. On a container or a hardened CI runner the checkout is
+  sometimes mounted read-only, and `generate` is the first thing that needs to write.
+- `.terragrunt-cache` owned by another user — the classic case is a run under `sudo` leaving
+  root-owned files behind for the next non-root run.
+- With the **`mutable-generate` experiment** (v1.1.3+) the generated file is a **read-only link
+  into the CAS** rather than an ordinary file. Anything expecting to edit it in place fails
+  here. `mutable = true` on that block gives it a writable file of its own.
+
+**Solutions:**
+
+```bash
+# Who owns the cache, and can you write it?
+ls -ld .terragrunt-cache
+find . -name .terragrunt-cache -user root
+
+# Move the cache somewhere writable rather than fighting the checkout:
+TG_DOWNLOAD_DIR=/tmp/tg-cache terragrunt run -- plan
+```
+
+`mutable` exists on three different blocks with three different meanings — check which one you
+are reading in `references/hcl-blocks.md` before setting it.
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Generate template error
 **Category:** configuration
 
-Error in generate block template
+`contents` failed to evaluate, usually inside a heredoc.
+
+**The trap is that a heredoc is still interpolated.** `${...}` inside `contents` is evaluated
+by *Terragrunt*, so any Terraform interpolation you meant to pass through to the generated file
+is consumed before Terraform ever sees it. Escape it as `$${...}` to emit a literal `${...}`.
 
 **Likely causes:**
-- Invalid HCL in contents
-- Template interpolation failed
-- Function error in contents
+- A Terraform expression in the generated file being eaten by Terragrunt's own interpolation.
+- A reference to a `local` or a function that is not resolvable at generate time.
+- An unterminated heredoc, or trailing whitespace after the opening `<<EOF`.
+
+**Solutions:**
+
+```hcl
+generate "provider" {
+  path      = "provider.tf"
+  if_exists = "overwrite_terragrunt"
+  contents  = <<EOF
+provider "aws" {
+  region = "${local.region}"        # evaluated by Terragrunt -- intended
+  assume_role {
+    role_arn = "$${var.role_arn}"   # emitted literally for Terraform -- escaped
+  }
+}
+EOF
+}
+```
+
+```bash
+# See exactly what would be written, with everything resolved:
+terragrunt render
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Generated file already exists
 **Category:** configuration
 
-Generated file already exists and cannot be overwritten
+A file is already at `path` and `if_exists` told Terragrunt to stop rather than replace it.
+
+**This is `if_exists` working, not failing.** With `error` it stops always; with
+`overwrite_terragrunt` it stops only when the existing file was **not** generated by Terragrunt
+— which means a human wrote it, or a previous run wrote it with `disable_signature = true` and
+Terragrunt can no longer recognise its own output.
 
 **Likely causes:**
-- File manually created with same name
-- Previous generation not cleaned up
-- Multiple generates target same file
+- A hand-written `provider.tf` or `backend.tf` in a module that a `generate` block also targets.
+- `disable_signature = true` on an earlier run, so the signature Terragrunt looks for is gone.
+- A stale file left in `.terragrunt-cache` from a run that was interrupted.
+
+**Solutions:**
+
+```bash
+# Which file, and did Terragrunt write it? Its signature comment is the tell:
+head -3 <module-dir>/provider.tf
+```
+
+```hcl
+# Then pick deliberately:
+if_exists = "overwrite_terragrunt"   # replace only Terragrunt's own output
+if_exists = "skip"                   # the hand-written file wins
+```
+
+Do not reach for `overwrite` to make the message go away — that is how a hand-written provider
+config disappears without anyone noticing.
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Hook command failed
 **Category:** configuration
 
-Before or after hook command failed
+The command in `execute` exited non-zero. Terragrunt reports the exit status; the reason is in
+the hook's own output.
+
+> **Hooks are nested inside the `terraform` block, not top level**, and `execute` takes a
+> **list**, not a string: `execute = ["echo", "Foo"]` runs `echo Foo`. A string is the most
+> common shape error and it does not read like one.
 
 **Likely causes:**
-- Command not found
-- Script error
-- Insufficient permissions
+- `execute` given a shell string rather than a list. `execute = ["ls -la"]` looks for a binary
+  literally named `ls -la`. Use `["ls", "-la"]`, or `["bash", "-c", "ls -la"]` when you
+  genuinely need a shell.
+- A relative path in `execute` resolved from the module directory rather than the config
+  directory.
+- The hook's output is hidden because `suppress_stdout = true` is set on it.
+
+**Solutions:**
+
+```hcl
+terraform {
+  before_hook "shell" {
+    commands = ["plan"]
+    execute  = ["bash", "-c", "set -euo pipefail; ./scripts/preflight.sh"]
+  }
+}
+```
+
+If you cannot see why it failed, remove `suppress_stdout` first — that attribute is the reason
+a failing hook can look silent.
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Hook environment variable missing
 **Category:** configuration
 
-Required environment variable for hook is missing
+A hook script expected an environment variable that is not set.
+
+**Terragrunt sets three context variables for every hook**, and they are the ones worth using
+rather than passing arguments:
+
+| variable | is |
+|---|---|
+| `TG_CTX_TF_PATH` | the `tofu`/`terraform` binary being wrapped |
+| `TG_CTX_COMMAND` | the subcommand that triggered the hook |
+| `TG_CTX_HOOK_NAME` | the hook's own label |
+
+Three more — `TG_CTX_HOOK_TYPE`, `TG_CTX_SOURCE`, `TG_CTX_TERRAGRUNT_DIR` — require the
+**`hook-context-env` experiment**. They are absent without it, which is the usual reason a
+script reading `TG_CTX_TERRAGRUNT_DIR` finds nothing.
 
 **Likely causes:**
-- Environment variable not exported
-- Variable name typo
-- Shell context different
+- Reading one of the three experiment-gated variables without enabling the experiment.
+- Expecting the parent shell's environment. A hook inherits Terragrunt's environment, so
+  anything set only in your interactive shell is absent in CI.
+- A `TF_VAR_*` set by a `before_hook` for a later hook — each `execute` is its own process and
+  exported variables do not survive between them.
+
+**Solutions:**
+
+```bash
+# Enable the extra three, if you want them:
+terragrunt run --experiment hook-context-env -- apply
+```
+
+```hcl
+# Otherwise pass what the script needs explicitly rather than relying on inheritance:
+execute = ["bash", "-c", "MY_DIR='${get_terragrunt_dir()}' ./scripts/x.sh"]
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Hook execution timeout
 **Category:** configuration
 
-Hook command exceeded timeout
+**Terragrunt has no hook timeout.** There is no `hook_timeout` attribute, no flag, and no
+default limit — a hook that hangs hangs the run, and Terragrunt waits. If something reported a
+"hook execution timeout", it came from your own script, from CI, or from the tool the hook
+called, not from Terragrunt.
+
+Recorded here because the name is what people search for, and the answer is that the mechanism
+they are looking for does not exist.
 
 **Likely causes:**
-- Command takes too long
-- Process hung or stuck
-- Timeout value too low
+- The CI job's own step timeout fired while a hook was waiting.
+- A hook waiting on input. There is no TTY in CI, so a prompt waits forever. Pass
+  `--non-interactive`, and make the hook non-interactive too.
+- A hook holding a lock or a network call with no timeout of its own.
+
+**Solutions:**
+
+```hcl
+# Put the bound in the hook, since Terragrunt will not:
+execute = ["timeout", "300", "${get_terragrunt_dir()}/scripts/slow.sh"]
+```
+
+```bash
+# And make sure nothing is waiting for a prompt:
+terragrunt run --non-interactive -- apply
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20: no hook timeout attribute exists.
 
 ## ERROR: Hook log suppression error
 **Category:** configuration
 
-Error with hook log suppression configuration
+Hook output you expected is missing. Usually not an error at all — `suppress_stdout` is doing
+exactly what it says.
+
+`suppress_stdout = true` exists so a script parsing OpenTofu/Terraform's output is not
+disrupted by a hook writing to the same stream. It suppresses the hook's **stdout**. A hook
+that fails silently is nearly always this attribute plus a script that writes its diagnostics
+to stdout rather than stderr.
 
 **Likely causes:**
-- Invalid suppress_stdout value
-- Logging configuration conflict
-- Output redirection failed
+- `suppress_stdout = true` on the hook you are trying to debug.
+- The hook writes to stdout when it should write to stderr, so suppression takes the errors too.
+- `--log-level` set low enough to hide Terragrunt's own hook lines.
+
+**Solutions:**
+
+```hcl
+# Drop the suppression while debugging, then put it back:
+before_hook "noisy" {
+  commands = ["plan"]
+  execute  = ["./scripts/x.sh"]
+  # suppress_stdout = true
+}
+```
+
+```bash
+terragrunt run --log-level debug -- plan
+```
+
+Write hook diagnostics to stderr (`echo "..." >&2`) so they survive suppression.
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Hook working directory error
 **Category:** configuration
 
-Cannot access hook working directory
+The hook ran somewhere other than where its relative paths expect.
+
+**The default working directory is not the same for every hook, and this is the surprise.**
+Hooks run from the **OpenTofu/Terraform module directory** — except hooks on `read-config` and
+`init-from-module`, which run from the **Terragrunt configuration directory** (where
+`terragrunt.hcl` lives). So the same `execute = ["./scripts/x.sh"]` works in one hook and not
+in another, in the same file.
 
 **Likely causes:**
-- Directory does not exist
-- Permissions issue
-- Path resolution failed
+- A relative script path, with the hook attached to a command whose default directory differs
+  from the one you tested.
+- The module directory is a **temporary** `.terragrunt-cache` copy when `source` is remote, so
+  paths relative to your repo do not exist there at all.
+- `working_dir` set to a path that does not exist yet at hook time.
+
+**Solutions:**
+
+```hcl
+terraform {
+  before_hook "preflight" {
+    commands = ["plan", "apply"]
+    # Anchor to the config directory rather than relying on the default:
+    execute  = ["${get_terragrunt_dir()}/scripts/preflight.sh"]
+    # or set it explicitly:
+    working_dir = get_terragrunt_dir()
+  }
+}
+```
+
+`get_terragrunt_dir()` is the reliable anchor: it is the directory of the config file being
+processed, whatever the hook's default happens to be.
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Include dependency resolution error
 **Category:** configuration
