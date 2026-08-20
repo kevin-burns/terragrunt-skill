@@ -26,7 +26,7 @@ cause.
 
 ## ERROR: AWS credentials not found
 
-**Category:** authentication  |  **Match:** `{}`
+**Category:** authentication
 
 AWS credentials are not configured or invalid
 
@@ -37,16 +37,13 @@ AWS credentials are not configured or invalid
 
 **Solutions:**
 
--
-  ```bash
-  aws configure
-  ```
--
--
+```bash
+aws configure
+```
 
 ## ERROR: Azure authentication required
 
-**Category:** authentication  |  **Match:** `{}`
+**Category:** authentication
 
 Not authenticated to Azure or subscription not accessible
 
@@ -57,19 +54,16 @@ Not authenticated to Azure or subscription not accessible
 
 **Solutions:**
 
--
-  ```bash
-  az login
-  ```
--
-  ```bash
-  az account set --subscription <subscription-id>
-  ```
--
+```bash
+az login
+```
+```bash
+az account set --subscription <subscription-id>
+```
 
 ## ERROR: GCP credentials not found
 
-**Category:** authentication  |  **Match:** `{}`
+**Category:** authentication
 
 GCP credentials are not configured
 
@@ -80,16 +74,13 @@ GCP credentials are not configured
 
 **Solutions:**
 
--
-  ```bash
-  gcloud auth application-default login
-  ```
--
--
+```bash
+gcloud auth application-default login
+```
 
 ## ERROR: Access denied to backend
 
-**Category:** backend  |  **Match:** `{}`
+**Category:** backend
 
 Insufficient permissions to access the backend storage
 
@@ -108,7 +99,7 @@ Insufficient permissions to access the backend storage
 
 ## ERROR: Azure storage account not found
 
-**Category:** backend  |  **Match:** `{}`
+**Category:** backend
 
 The Azure storage account for remote state does not exist
 
@@ -123,18 +114,18 @@ The Azure storage account for remote state does not exist
 **Solutions:**
 
 - Verify the account exists in the right subscription:
-  ```bash
-  az storage account show --name <account-name> --subscription <subscription-id>
-  ```
+```bash
+az storage account show --name <account-name> --subscription <subscription-id>
+```
 - Create the account + container out-of-band (see references/azure-backend.md):
-  ```bash
-  az storage account create -n <account-name> -g <rg> -l <region> --kind StorageV2
-  az storage container create -n <container> --account-name <account-name> --auth-mode login
-  ```
+```bash
+az storage account create -n <account-name> -g <rg> -l <region> --kind StorageV2
+az storage container create -n <container> --account-name <account-name> --auth-mode login
+```
 
 ## ERROR: Azure backend 403 (AuthorizationFailure / shared key access disabled)
 
-**Category:** backend  |  **Match:** `{}`
+**Category:** backend
 
 `init` against the azurerm backend fails with 403 (Forbidden) / AuthorizationFailure
 
@@ -148,16 +139,16 @@ The Azure storage account for remote state does not exist
 - Switch to Entra ID auth in the backend config: `use_azuread_auth = true` (or `use_oidc` in
   CI).
 - Assign a data-plane role to the deploying identity:
-  ```bash
-  az role assignment create --assignee <objectId> \
-    --role "Storage Blob Data Contributor" \
-    --scope <storage-account-resource-id>
-  ```
+```bash
+az role assignment create --assignee <objectId> \
+  --role "Storage Blob Data Contributor" \
+  --scope <storage-account-resource-id>
+```
 - Allow up to ~10 min (30 at MG scope) for the role assignment to propagate.
 
 ## ERROR: azurerm provider requires subscription_id (v4+)
 
-**Category:** provider  |  **Match:** `{}`
+**Category:** provider
 
 `azurerm` provider v4+ errors that the subscription ID is required
 
@@ -171,7 +162,7 @@ The Azure storage account for remote state does not exist
 
 ## ERROR: GCS bucket not found
 
-**Category:** backend  |  **Match:** `{}`
+**Category:** backend
 
 The GCS bucket for remote state does not exist
 
@@ -182,16 +173,13 @@ The GCS bucket for remote state does not exist
 
 **Solutions:**
 
--
--
-  ```bash
-  gsutil ls gs://<bucket-name>
-  ```
--
+```bash
+gsutil ls gs://<bucket-name>
+```
 
 ## ERROR: S3 bucket does not exist
 
-**Category:** backend  |  **Match:** `{}`
+**Category:** backend
 
 The S3 bucket specified for remote state does not exist
 
@@ -202,16 +190,13 @@ The S3 bucket specified for remote state does not exist
 
 **Solutions:**
 
--
--
-  ```bash
-  aws s3 ls s3://<bucket-name>
-  ```
--
+```bash
+aws s3 ls s3://<bucket-name>
+```
 
 ## ERROR: After apply hook failed
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 After apply hook execution failed
 
@@ -222,13 +207,9 @@ After apply hook execution failed
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Before init hook failed
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Before init hook execution failed
 
@@ -239,13 +220,9 @@ Before init hook execution failed
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Circular dependency in locals
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Local variables have circular dependencies
 
@@ -256,13 +233,9 @@ Local variables have circular dependencies
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Circular include detected
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Include files create a circular reference
 
@@ -273,13 +246,9 @@ Include files create a circular reference
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Configuration path not found
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Referenced file or directory does not exist
 
@@ -290,13 +259,9 @@ Referenced file or directory does not exist
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Duplicate configuration block
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Configuration block defined multiple times
 
@@ -307,13 +272,9 @@ Configuration block defined multiple times
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Function evaluation error
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Error evaluating Terragrunt function
 
@@ -324,13 +285,9 @@ Error evaluating Terragrunt function
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Generate if_exists strategy error
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Invalid if_exists strategy in generate block
 
@@ -341,13 +298,9 @@ Invalid if_exists strategy in generate block
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Generate invalid path
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Generated file path is invalid
 
@@ -358,13 +311,9 @@ Generated file path is invalid
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Generate permission denied
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Insufficient permissions to write generated file
 
@@ -375,13 +324,9 @@ Insufficient permissions to write generated file
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Generate template error
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Error in generate block template
 
@@ -392,13 +337,9 @@ Error in generate block template
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Generated file already exists
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Generated file already exists and cannot be overwritten
 
@@ -409,13 +350,9 @@ Generated file already exists and cannot be overwritten
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Hook command failed
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Before or after hook command failed
 
@@ -426,13 +363,9 @@ Before or after hook command failed
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Hook environment variable missing
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Required environment variable for hook is missing
 
@@ -443,13 +376,9 @@ Required environment variable for hook is missing
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Hook execution timeout
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Hook command exceeded timeout
 
@@ -460,13 +389,9 @@ Hook command exceeded timeout
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Hook log suppression error
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Error with hook log suppression configuration
 
@@ -477,13 +402,9 @@ Error with hook log suppression configuration
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Hook working directory error
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Cannot access hook working directory
 
@@ -494,13 +415,9 @@ Cannot access hook working directory
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Include dependency resolution error
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Cannot resolve dependencies in included configuration
 
@@ -511,13 +428,9 @@ Cannot resolve dependencies in included configuration
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Include expose configuration conflict
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Conflict in include expose configuration
 
@@ -528,13 +441,9 @@ Conflict in include expose configuration
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Include file not found
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Referenced include file does not exist
 
@@ -545,13 +454,9 @@ Referenced include file does not exist
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Include file parse error
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Syntax error in included file
 
@@ -562,13 +467,9 @@ Syntax error in included file
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Include merge conflict
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Cannot merge configurations from includes
 
@@ -579,13 +480,9 @@ Cannot merge configurations from includes
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Include path traversal limit
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Exceeded limit searching for include file
 
@@ -596,13 +493,9 @@ Exceeded limit searching for include file
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Interpolation error
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Error in variable interpolation or template
 
@@ -613,13 +506,9 @@ Error in variable interpolation or template
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Invalid attribute value
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Invalid or unsupported attribute in configuration
 
@@ -630,13 +519,9 @@ Invalid or unsupported attribute in configuration
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Invalid configuration block
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Invalid or unsupported block in terragrunt.hcl
 
@@ -647,13 +532,9 @@ Invalid or unsupported block in terragrunt.hcl
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Invalid terraform source
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 The terraform source URL format is invalid
 
@@ -664,13 +545,9 @@ The terraform source URL format is invalid
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Local evaluation error
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Error evaluating local variable expression
 
@@ -681,13 +558,9 @@ Error evaluating local variable expression
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Local type error
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Local variable has wrong type
 
@@ -698,13 +571,9 @@ Local variable has wrong type
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Locals merge error
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Error merging locals from includes
 
@@ -715,13 +584,9 @@ Error merging locals from includes
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Missing required input variable
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 A required input variable is not provided
 
@@ -732,13 +597,9 @@ A required input variable is not provided
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: No Terraform configuration files found
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Terragrunt cannot find any .tf files in the source directory
 
@@ -749,13 +610,9 @@ Terragrunt cannot find any .tf files in the source directory
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Remote state configuration missing
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Remote state backend is not configured
 
@@ -766,13 +623,9 @@ Remote state backend is not configured
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Required attribute missing
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Required configuration attribute is not provided
 
@@ -783,13 +636,9 @@ Required configuration attribute is not provided
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Syntax error in configuration
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 HCL syntax error in terragrunt.hcl or .tf files
 
@@ -800,13 +649,9 @@ HCL syntax error in terragrunt.hcl or .tf files
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Type mismatch error
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Value type does not match expected type
 
@@ -817,13 +662,9 @@ Value type does not match expected type
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Undefined local reference
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Referenced local variable is not defined
 
@@ -834,13 +675,9 @@ Referenced local variable is not defined
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Working directory error
 
-**Category:** configuration  |  **Match:** `{}`
+**Category:** configuration
 
 Cannot access or change to working directory
 
@@ -851,13 +688,9 @@ Cannot access or change to working directory
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Circular dependency detected
 
-**Category:** dependency  |  **Match:** `{}`
+**Category:** dependency
 
 Modules have circular dependencies which Terraform cannot resolve
 
@@ -868,13 +701,9 @@ Modules have circular dependencies which Terraform cannot resolve
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Circular module source reference
 
-**Category:** dependency  |  **Match:** `{}`
+**Category:** dependency
 
 Module source creates a circular reference
 
@@ -885,13 +714,9 @@ Module source creates a circular reference
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Could not download source
 
-**Category:** dependency  |  **Match:** `{}`
+**Category:** dependency
 
 Failed to download module source code
 
@@ -902,13 +727,9 @@ Failed to download module source code
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Git authentication failed
 
-**Category:** dependency  |  **Match:** `{}`
+**Category:** dependency
 
 Failed to authenticate with Git repository
 
@@ -919,13 +740,9 @@ Failed to authenticate with Git repository
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Git ref not found
 
-**Category:** dependency  |  **Match:** `{}`
+**Category:** dependency
 
 Specified Git tag or branch does not exist
 
@@ -936,13 +753,9 @@ Specified Git tag or branch does not exist
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Local module path invalid
 
-**Category:** dependency  |  **Match:** `{}`
+**Category:** dependency
 
 Local module path is invalid or inaccessible
 
@@ -953,13 +766,9 @@ Local module path is invalid or inaccessible
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Module archive extraction error
 
-**Category:** dependency  |  **Match:** `{}`
+**Category:** dependency
 
 Failed to extract module archive
 
@@ -970,13 +779,9 @@ Failed to extract module archive
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Module cache corrupted
 
-**Category:** dependency  |  **Match:** `{}`
+**Category:** dependency
 
 Module cache is corrupted
 
@@ -987,16 +792,13 @@ Module cache is corrupted
 
 **Solutions:**
 
--
-  ```bash
-  terragrunt clear-cache
-  ```
--
--
+```bash
+terragrunt clear-cache
+```
 
 ## ERROR: Module checksum mismatch
 
-**Category:** dependency  |  **Match:** `{}`
+**Category:** dependency
 
 Downloaded module checksum does not match expected value
 
@@ -1007,13 +809,9 @@ Downloaded module checksum does not match expected value
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Module not found
 
-**Category:** dependency  |  **Match:** `{}`
+**Category:** dependency
 
 Terragrunt cannot locate a referenced module
 
@@ -1024,13 +822,9 @@ Terragrunt cannot locate a referenced module
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Module registry unavailable
 
-**Category:** dependency  |  **Match:** `{}`
+**Category:** dependency
 
 Cannot access Terraform module registry
 
@@ -1041,13 +835,9 @@ Cannot access Terraform module registry
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Module subdirectory not found
 
-**Category:** dependency  |  **Match:** `{}`
+**Category:** dependency
 
 Specified subdirectory does not exist in module source
 
@@ -1058,13 +848,9 @@ Specified subdirectory does not exist in module source
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Module version not found
 
-**Category:** dependency  |  **Match:** `{}`
+**Category:** dependency
 
 No module version matches the specified constraint
 
@@ -1075,13 +861,9 @@ No module version matches the specified constraint
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Connection refused
 
-**Category:** network  |  **Match:** `{}`
+**Category:** network
 
 Cannot establish connection to remote service
 
@@ -1092,13 +874,9 @@ Cannot establish connection to remote service
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Network timeout
 
-**Category:** network  |  **Match:** `{}`
+**Category:** network
 
 Network operation timed out
 
@@ -1109,13 +887,9 @@ Network operation timed out
 
 **Solutions:**
 
--
--
--
-
 ## ERROR: Backend configuration changed
 
-**Category:** state  |  **Match:** `{}`
+**Category:** state
 
 The backend configuration has changed and state needs to be migrated
 
@@ -1126,19 +900,16 @@ The backend configuration has changed and state needs to be migrated
 
 **Solutions:**
 
--
-  ```bash
-  terragrunt init -reconfigure
-  ```
--
-  ```bash
-  terragrunt init -migrate-state
-  ```
--
+```bash
+terragrunt init -reconfigure
+```
+```bash
+terragrunt init -migrate-state
+```
 
 ## ERROR: Error acquiring state lock
 
-**Category:** state  |  **Match:** `{}`
+**Category:** state
 
 Unable to acquire state lock, usually because another process has it
 
@@ -1149,16 +920,13 @@ Unable to acquire state lock, usually because another process has it
 
 **Solutions:**
 
--
--
--
-  ```bash
-  terragrunt force-unlock <LOCK_ID>
-  ```
+```bash
+terragrunt force-unlock <LOCK_ID>
+```
 
 ## ERROR: Failed to get existing workspaces
 
-**Category:** state  |  **Match:** `{}`
+**Category:** state
 
 Cannot retrieve or access Terraform workspace
 
@@ -1169,22 +937,19 @@ Cannot retrieve or access Terraform workspace
 
 **Solutions:**
 
--
-  ```bash
-  terragrunt init
-  ```
--
-  ```bash
-  terragrunt workspace list
-  ```
--
-  ```bash
-  terragrunt workspace new <name>
-  ```
+```bash
+terragrunt init
+```
+```bash
+terragrunt workspace list
+```
+```bash
+terragrunt workspace new <name>
+```
 
 ## ERROR: Provider not found
 
-**Category:** terraform  |  **Match:** `{}`
+**Category:** terraform
 
 Required Terraform provider is not installed
 
@@ -1195,16 +960,13 @@ Required Terraform provider is not installed
 
 **Solutions:**
 
--
-  ```bash
-  terragrunt init
-  ```
--
--
+```bash
+terragrunt init
+```
 
 ## ERROR: Provider version constraint
 
-**Category:** terraform  |  **Match:** `{}`
+**Category:** terraform
 
 Provider version does not meet requirements
 
@@ -1215,16 +977,13 @@ Provider version does not meet requirements
 
 **Solutions:**
 
--
--
-  ```bash
-  terragrunt init -upgrade
-  ```
--
+```bash
+terragrunt init -upgrade
+```
 
 ## ERROR: Terraform version constraint not met
 
-**Category:** terraform  |  **Match:** `{}`
+**Category:** terraform
 
 The installed Terraform version does not meet requirements
 
@@ -1235,9 +994,6 @@ The installed Terraform version does not meet requirements
 
 **Solutions:**
 
--
-  ```bash
-  terraform version
-  ```
--
--
+```bash
+terraform version
+```
