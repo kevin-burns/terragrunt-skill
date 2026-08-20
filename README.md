@@ -23,7 +23,7 @@ the listed reference, act:
 | Scaffold configs, envs, stacks | GENERATE | `architecture-patterns.md` + `templates/` |
 | Validate / lint / CI | VALIDATE | `scripts/validate.sh`, `cli-reference.md` |
 | Review or audit a repo | REVIEW | `best-practices.md` |
-| An error was pasted | DIAGNOSE | grep `error-patterns.md` — 69 diagnosed errors, 17 with a fix |
+| An error was pasted | DIAGNOSE | grep `error-patterns.md` — 69 diagnosed errors, 24 with a fix |
 | "What does X do" | LOOKUP | grep the matching reference |
 | Multi-account, mocks, AVM, CFT | EXAMPLES | `advanced-examples.md` — 28 worked examples |
 | OIDC, plan-then-apply pipelines | CI/CD | `cicd.md` |

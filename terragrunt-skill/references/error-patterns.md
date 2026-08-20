@@ -4,9 +4,9 @@
 > harvested at import from omattsson/terragrunt-mcp-server — a repo whose last commit is
 > 2026-02-22, five weeks before Terragrunt v1.0.0 existed. Three were written here
 > (both Azure entries, and `ParentFileNotFoundError`, which was reproduced on 1.1.3).
-> Seven have since been rewritten against the 1.1.3 binary and a dated docs snapshot.
+> Thirteen have since been rewritten against the 1.1.3 binary and a dated docs snapshot.
 >
-> **What that means for you.** Every entry names likely causes. **Only 17 carry a fix**, and an
+> **What that means for you.** Every entry names likely causes. **Only 24 carry a fix**, and an
 > entry with no `**Solutions:**` section has none to give — say so rather than improvising one.
 > An entry carrying a "Verified against terragrunt 1.1.3" line was checked against the binary
 > on that date; the rest were not, and may describe a pre-1.0 world. Flag and avoid pre-1.0
@@ -647,12 +647,32 @@ Cannot access or change to working directory
 ## ERROR: Circular dependency detected
 **Category:** dependency
 
-Modules have circular dependencies which Terraform cannot resolve
+Two or more units depend on each other, directly or through a chain, so no valid run order
+exists and `run --all` refuses to build a queue.
 
 **Likely causes:**
-- Module A depends on Module B which depends on Module A
-- Indirect circular dependency through multiple modules
-- Output references create circular dependency
+- A `dependency` block in A pointing at B while B points back at A.
+- An indirect cycle through a third unit — the usual case, and the one nobody spots by reading.
+- A `dependencies` block added "to force ordering" that closed a loop the outputs did not need.
+
+**Solutions:**
+
+```bash
+# Print the DAG and look at it. This is the command for this error:
+terragrunt dag graph
+
+# It emits DOT, so render it if the estate is large:
+terragrunt dag graph | dot -Tsvg > dag.svg
+```
+
+`dag graph` is an alias for `list --format=dot --dag --dependencies --external`, so the same
+picture is available from `list` if you want to filter it.
+
+Break the cycle by removing the weaker edge — usually a `dependencies` entry that exists for
+ordering rather than for an output. If both units genuinely need a value from the other, one of
+them is two units.
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Circular module source reference
 **Category:** dependency
@@ -677,22 +697,60 @@ Failed to download module source code
 ## ERROR: Git authentication failed
 **Category:** dependency
 
-Failed to authenticate with Git repository
+The Git remote in `source` refused the credentials, or was given none.
 
 **Likely causes:**
-- SSH key not configured
-- Git credentials expired or invalid
-- Repository requires authentication
+- **The URL scheme decides which credential is used, and they do not interchange.**
+  `git::git@github.com:org/repo.git` uses SSH and needs a key with an agent;
+  `git::https://github.com/org/repo.git` uses HTTPS and needs a token or a credential helper.
+  A CI runner with a token and an SSH-form source will fail no matter how correct the token is.
+- No SSH agent in the environment Terragrunt runs in — a common surprise inside a container or
+  a hook, where the agent socket is not forwarded.
+- The token is valid but lacks read access to that specific repository.
+
+**Solutions:**
+
+```bash
+# Test the exact remote the source names, in the same environment Terragrunt runs in:
+GIT_TERMINAL_PROMPT=0 git ls-remote git@github.com:org/modules.git
+
+# SSH form, no agent? Confirm the key is loaded:
+ssh-add -l && ssh -T git@github.com
+
+# In CI, rewrite SSH to HTTPS-with-token once rather than editing every source:
+git config --global url."https://oauth2:$TOKEN@github.com/".insteadOf "git@github.com:"
+```
+
+Never put a token in the `source` string — it lands in `.terragrunt-cache` and in logs. See
+`references/cicd.md` for the OIDC route.
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Git ref not found
 **Category:** dependency
 
-Specified Git tag or branch does not exist
+The `?ref=` in the source names a tag, branch or commit the remote does not have.
 
 **Likely causes:**
-- Tag or branch name is incorrect
-- Tag/branch was deleted
-- Typo in ref parameter
+- A typo, or a tag that was deleted or moved. A *moved* tag is the nasty one: the ref resolves,
+  but Terragrunt may still be holding the old contents in its cache.
+- The ref exists on a fork or a private mirror, not on the remote the source names.
+- A shallow or filtered clone in CI that did not fetch tags.
+
+**Solutions:**
+
+```bash
+# Does the remote have it? No clone required:
+git ls-remote --tags --heads git@github.com:org/modules.git | grep <ref>
+
+# Tag moved, or you suspect a stale cache: discard the cached source and refetch.
+terragrunt run --source-update -- init
+```
+
+Pin to an immutable ref — a tag you never move, or a commit SHA. A branch name in `?ref=` means
+the module can change under a run that changed nothing.
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Local module path invalid
 **Category:** dependency
@@ -715,7 +773,6 @@ Failed to extract module archive
 - Insufficient disk space
 
 ## ERROR: Module cache corrupted
-
 **Category:** dependency
 
 A half-written or unreadable `.terragrunt-cache` makes a module fail to load, most often as a
@@ -750,22 +807,59 @@ Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 ## ERROR: Module checksum mismatch
 **Category:** dependency
 
-Downloaded module checksum does not match expected value
+The downloaded module does not hash to what was expected.
 
 **Likely causes:**
-- Module was modified after download
-- Network corruption during download
-- Lock file out of sync
+- **Two runs racing on one machine.** Before **v1.1.3**, concurrent runs staged provider
+  downloads at the same path, so the first to finish could delete an archive the other was
+  still unpacking. It surfaces as a checksum error or `failed to open zip archive`. On a
+  parallel CI matrix with a shared runner, upgrading is the fix — not clearing anything.
+- A moved tag: the ref is the same, the contents are not.
+- A lock file committed from a different platform, or a truncated download.
+
+**Solutions:**
+
+```bash
+terragrunt --version          # below 1.1.3 with parallel runs? upgrade first
+
+# Then discard the cached source and refetch:
+terragrunt run --source-update -- init
+```
+
+If it persists on a single serial run, the module content genuinely changed under a fixed ref.
+Re-pin to a commit SHA rather than a tag.
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Module not found
 **Category:** dependency
 
-Terragrunt cannot locate a referenced module
+Terragrunt cannot resolve the `source` in the `terraform` block.
 
 **Likely causes:**
-- Module path is incorrect
-- Module does not exist at specified location
-- Git repository or URL is inaccessible
+- **The `//` is missing.** In a Git source, a *double* slash separates the repository from the
+  subdirectory inside it: `git::git@github.com:org/modules.git//vpc?ref=v1.4.0`. With a single
+  slash the whole path is treated as the repo. This is the most common form of this error and
+  it does not look like a syntax problem.
+- A relative local path resolved from the wrong place. A local `source` resolves relative to
+  the unit's own directory, not your shell's.
+- The ref exists but the subdirectory does not at that ref — see "Module subdirectory not found".
+- Terragrunt is serving a stale cached copy of the source.
+
+**Solutions:**
+
+```bash
+# What did Terragrunt actually resolve? render shows the config after includes and functions:
+terragrunt render
+
+# Force a fresh download rather than the cached copy:
+terragrunt run --source-update -- init
+
+# Point every source somewhere else without editing any file (useful to test a local clone):
+terragrunt run --source-map git::git@github.com:org/modules.git=/abs/path/to/local -- plan
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Module registry unavailable
 **Category:** dependency
@@ -780,22 +874,60 @@ Cannot access Terraform module registry
 ## ERROR: Module subdirectory not found
 **Category:** dependency
 
-Specified subdirectory does not exist in module source
+The source resolved to a repository, but the subdirectory after the `//` is not in it.
+
+**A double slash is REQUIRED, not a mistake.** `//` is how a module source separates the
+repository from the path inside it, and it is also what makes relative paths between modules in
+that repo work. If you are here because something told you double slashes are the bug, that is
+backwards — a *single* slash is the bug.
 
 **Likely causes:**
-- Subdirectory path is incorrect
-- Path changed in module version
-- Double slashes in path
+- The path after `//` is wrong, or is relative to the repo root when you wrote it relative to
+  something else.
+- The directory moved between refs. `?ref=v1.4.0` and `?ref=v2.0.0` can have different layouts,
+  and the error only appears when you bump the ref.
+- A trailing slash or a leading `./` after the `//`.
+
+**Solutions:**
+
+```bash
+# What did Terragrunt actually resolve the source to?
+terragrunt render
+
+# Check the layout at the exact ref you pinned. A shallow clone is enough:
+git clone --depth 1 --branch <ref> git@github.com:org/modules.git /tmp/mod-check
+ls /tmp/mod-check/<subdir>
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Module version not found
 **Category:** dependency
 
-No module version matches the specified constraint
+No published version of a registry module satisfies the constraint.
 
 **Likely causes:**
-- Version constraint too strict
-- Requested version does not exist
-- Module has no published versions
+- The constraint is tighter than anything published, or names a version that was yanked.
+- The module has no published versions at all — usually a namespace or provider typo in the
+  `tfr://` address.
+- **You used a `version` attribute without the experiment.** Resolving a `tfr://` module by
+  constraint rather than by an exact version in the URL is the `version-attribute` experiment
+  and needs **v1.1.1+** plus the flag. Without it the attribute is not available, and the
+  version has to be pinned in the source URL itself.
+- A bare `tfr:///` (three slashes) does not resolve to a fixed registry — see
+  `references/hcl-blocks.md` under `## BLOCK: terraform`.
+
+**Solutions:**
+
+```bash
+# What versions actually exist? The terraform-registry skill answers this offline:
+tfreg inspect-module terraform-aws-modules/vpc/aws --fields versions
+
+# Pin the version in the source URL, which needs no experiment:
+#   source = "tfr:///terraform-aws-modules/vpc/aws?version=5.8.1"
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Connection refused
 **Category:** network
