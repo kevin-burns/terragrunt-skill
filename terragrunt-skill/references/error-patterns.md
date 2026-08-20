@@ -1,12 +1,13 @@
 # Terragrunt Error Diagnosis Playbook
 
-> **Provenance, measured 2026-08-20 rather than asserted.** 66 of these 69 entries were
+> **Provenance, measured 2026-08-20 rather than asserted.** 66 of the 69 entries at import were
 > harvested at import from omattsson/terragrunt-mcp-server — a repo whose last commit is
 > 2026-02-22, five weeks before Terragrunt v1.0.0 existed. Three were written here
 > (both Azure entries, and `ParentFileNotFoundError`, which was reproduced on 1.1.3).
-> Twenty-five have since been rewritten against the 1.1.3 binary and a dated docs snapshot.
+> Thirty-seven have since been rewritten against the 1.1.3 binary and a dated docs snapshot,
+> and nine generic HCL entries were folded into one.
 >
-> **What that means for you.** Every entry names likely causes. **Only 36 carry a fix**, and an
+> **What that means for you.** Every entry names likely causes. **Only 49 carry a fix**, and an
 > entry with no `**Solutions:**` section has none to give — say so rather than improvising one.
 > An entry carrying a "Verified against terragrunt 1.1.3" line was checked against the binary
 > on that date; the rest were not, and may describe a pre-1.0 world. Flag and avoid pre-1.0
@@ -30,7 +31,7 @@ cause.
 - **authentication** (3): AWS credentials not found, Azure authentication required, GCP credentials not found
 - **backend** (5): S3 bucket does not exist, Access denied to backend, GCS bucket not found, Azure storage account not found, Azure backend 403 (shared key disabled / missing RBAC)
 - **provider** (1): azurerm provider requires subscription_id (v4+)
-- **configuration** (38): No Terraform configuration files found, Syntax error in configuration, Missing required input variable, Invalid configuration block, Duplicate configuration block, Invalid attribute value, Required attribute missing, Invalid terraform source…
+- **configuration** (31): HCL that will not parse or evaluate, the seven `include` entries, the five `generate` entries, the five `locals` entries, the seven hook entries, No Terraform configuration files found, Missing required input variable, Remote state configuration missing, Invalid terraform source, Working directory error, ParentFileNotFoundError on a file that sits beside the config
 - **dependency** (13): Circular dependency detected, Module not found, Could not download source, Git authentication failed, Git ref not found, Module subdirectory not found, Module registry unavailable, Module checksum mismatch…
 - **network** (2): Network timeout, Connection refused
 - **state** (3): Error acquiring state lock, Backend configuration changed, Failed to get existing workspaces
@@ -301,52 +302,133 @@ Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 ## ERROR: Circular dependency in locals
 **Category:** configuration
 
-Local variables have circular dependencies
+Two locals referencing each other, so neither can be evaluated.
+
+**The error does not contain the word "circular", which is why grepping for it fails.**
+Terragrunt evaluates `locals` in passes, and reports an unresolvable reference as one that is
+not ready. Reproduced on 1.1.3 with `a = local.b` and `b = local.a`:
+
+```
+Error: Can't evaluate expression
+  on terragrunt.hcl line 5, in locals:
+   5:   b = local.a
+The local reference 'a' is not evaluated. Either it is not ready yet in the current pass, or
+there was an error evaluating it in an earlier stage.
+```
+
+**Read "is not evaluated" as "cannot be evaluated from here".** The same message appears when
+the reference is not circular at all but simply failed earlier — see "Local evaluation error".
 
 **Likely causes:**
-- Local A references local B which references local A
-- Indirect circular reference through multiple locals
-- Self-referencing local
+- A genuine two-way reference between locals.
+- A local referring to itself, often after a rename.
+- A chain through `read_terragrunt_config` that comes back to the file it started in.
+
+**Solutions:**
+
+```bash
+# Which local is unresolvable? render evaluates everything and stops at the first one:
+terragrunt render
+```
+
+Break the loop by computing the shared part once and having both locals read it, or by moving it
+into a file both read with `read_terragrunt_config`.
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Circular include detected
 **Category:** configuration
 
-Include files create a circular reference
+An include chain that Terragrunt refuses to follow. In practice this is almost never a true
+cycle — it is a **chain**, and Terragrunt allows none.
+
+> **Terragrunt supports ONE level of `include`.** If a config you include has its own `include`
+> block, the run fails. Reproduced on 1.1.3:
+>
+> ```
+> a/b/terragrunt.hcl includes a/mid.hcl, which itself includes root.hcl.
+> Only one level of includes is allowed.
+> ```
+>
+> Tracked upstream as gruntwork-io/terragrunt#1566. Until it lands, a child must include every
+> file it needs **directly** — `include` blocks are additive and merge by label, so several
+> siblings are fine; a chain is not.
 
 **Likely causes:**
-- File A includes file B which includes file A
-- Indirect circular include through multiple files
-- Self-referencing include
+- An `_envcommon`-style file that itself includes the root, included by a unit. Two hops.
+- A genuine loop: A includes B, B includes A.
+- Refactoring a shared file into a "base" that includes another base.
 
-## ERROR: Configuration path not found
+**Solutions:**
+
+```hcl
+# Flatten it. Both files, directly, in the unit:
+include "root" {
+  path = find_in_parent_folders("root.hcl")
+}
+
+include "envcommon" {
+  path           = "${dirname(find_in_parent_folders("root.hcl"))}/_envcommon/service.hcl"
+  merge_strategy = "deep"
+}
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
+
+## ERROR: HCL that will not parse or evaluate
+
 **Category:** configuration
 
-Referenced file or directory does not exist
+Generic HCL failures — a syntax error, an unknown attribute, a duplicate block, a bad
+interpolation, a type mismatch, a function called wrongly. **Nine separate entries used to sit
+here, one per wording. They were folded into this one on 2026-08-20** because none of them said
+anything Terragrunt-specific: the same text would apply to any HCL, the causes restated the
+titles, and `terragrunt hcl validate` already reports every one of them with a file, a line and
+a fix — which is more than any of those entries offered.
 
 **Likely causes:**
-- Path is incorrect
-- File was moved or deleted
-- Relative path resolved incorrectly
+- A brace, quote or bracket that does not close — including a single-line block left open.
+- An attribute the block does not define, or the same block declared twice.
+- A `${...}` that references something not in scope at that evaluation stage.
+- A value of the wrong type: `yamldecode` preserves the source type, so `"true"` is a string.
+- A function called with the wrong arity or argument types.
 
-## ERROR: Duplicate configuration block
-**Category:** configuration
+**Solutions:**
 
-Configuration block defined multiple times
+**Run the validator. It is better than this file at this class of error.**
 
-**Likely causes:**
-- Same block appears twice in terragrunt.hcl
-- Block inherited from include and redefined
-- Merged includes have duplicate blocks
+```bash
+terragrunt hcl validate            # every config under the current directory
+terragrunt hcl fmt --check --diff  # formatting, separately
+```
 
-## ERROR: Function evaluation error
-**Category:** configuration
+It points at the line. A real one, from 1.1.3:
 
-Error evaluating Terragrunt function
+```
+│ Error: Invalid single-argument block definition
+│
+│   on terragrunt.hcl line 1, in terraform:
+│    1: terraform { source = "./mod"
+│    2: inputs = { a = }
+│
+│ An argument definition on the same line as its containing block creates a
+│ single-line block definition, which must also be closed on the same line.
+```
 
-**Likely causes:**
-- Function arguments are invalid
-- Function not available in this context
-- Runtime error in function execution
+**Two Terragrunt-specific traps that look like generic HCL errors and are not:**
+
+- **`values.*` is unbound outside a generated unit.** Validating a `catalog/` unit in place
+  reports `Error: Unknown variable` for every `values.` reference. That is not a defect —
+  run `terragrunt stack generate` and validate the materialised units instead. See
+  `references/architecture-patterns.md`, `## PATTERN: two accounts, many regions`.
+- **A `${...}` inside a `generate` heredoc is evaluated by Terragrunt**, not passed through.
+  Escape it as `$${...}` to emit a literal one. See "Generate template error".
+
+If the validator passes and the config still misbehaves, the problem is evaluation rather than
+syntax — see "Local evaluation error" and "Include merge conflict", and read the resolved
+config with `terragrunt render`.
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Generate if_exists strategy error
 **Category:** configuration
@@ -702,92 +784,210 @@ Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 ## ERROR: Include dependency resolution error
 **Category:** configuration
 
-Cannot resolve dependencies in included configuration
+A `dependency` block inherited through an include does not resolve.
 
 **Likely causes:**
-- Dependency defined in include not accessible
-- Output reference invalid
-- Dependency execution order wrong
+- The `config_path` in the inherited `dependency` is relative, and relative paths in an included
+  config resolve from the **including unit**, not from the file that declared them. A path that
+  worked for one unit breaks for a unit at a different depth.
+- The dependency's outputs do not exist yet because that unit has never been applied. Use
+  `mock_outputs` with `mock_outputs_allowed_terraform_commands` so `plan` works before the first
+  apply.
+- A `dependencies` block (plural) inherited from several includes, whose paths concatenate under
+  shallow merge — see "Include merge conflict".
+
+**Solutions:**
+
+```hcl
+# In the shared file, anchor rather than count directories:
+dependency "vpc" {
+  config_path = "${dirname(find_in_parent_folders("root.hcl"))}/network/vpc"
+
+  mock_outputs = {
+    vpc_id = "vpc-00000000"
+  }
+  mock_outputs_allowed_terraform_commands = ["plan", "validate"]
+}
+```
+
+```bash
+terragrunt render          # what config_path did it actually resolve to?
+terragrunt dag graph       # and does the edge exist where you think?
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Include expose configuration conflict
 **Category:** configuration
 
-Conflict in include expose configuration
+A reference to `include.<label>.…` that does not resolve.
+
+**`expose` is off by default, and nothing about the failure says so.** Without
+`expose = true` on the include block, the included config's `locals` and `inputs` are not
+reachable at all — and a parent's `locals` are **never** available as bare `local.x` in the
+child, exposed or not.
+
+Reproduced on 1.1.3, a child referencing `local.region` for a local defined in the included
+root:
+
+```
+Error: Unsupported attribute
+  on child/terragrunt.hcl line 3:
+   3: inputs = { r = local.region }
+```
+
+Adding `expose = true` and reading `include.root.locals.region` resolves it.
 
 **Likely causes:**
-- Multiple includes expose same block
-- Expose configuration incompatible
-- Invalid expose value
+- `expose` not set.
+- The label in the reference not matching the block's label — `include.root` requires
+  `include "root"`.
+- Expecting inheritance of `locals`. They do not inherit. Only `expose` makes them reachable,
+  and under a different name.
+
+**Solutions:**
+
+```hcl
+include "root" {
+  path   = find_in_parent_folders("root.hcl")
+  expose = true
+}
+
+locals {
+  region = include.root.locals.region     # NOT local.region
+}
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Include file not found
 **Category:** configuration
 
-Referenced include file does not exist
+The `path` in an `include` block does not resolve to a file. Reproduced on 1.1.3:
+
+```
+Include configuration not found: /repo/live/nope.hcl (referenced from: /repo/live/terragrunt.hcl)
+```
+
+The message names both files, which is the fastest way to see whether the path or the
+referencing location is wrong.
 
 **Likely causes:**
-- Include path is incorrect
-- File was moved or deleted
-- Path resolution failed
+- `find_in_parent_folders` pointed at a **sibling**. It searches strictly upward and never looks
+  in the referencing file's own directory — see the `ParentFileNotFoundError` entry.
+- A relative `path` written relative to the repo root rather than to the unit.
+- The file exists but is named `terragrunt.hcl` while the include asks for `root.hcl`, or the
+  reverse. 1.x convention is `root.hcl`.
+
+**Solutions:**
+
+```hcl
+include "root" {
+  path = find_in_parent_folders("root.hcl")     # an ancestor
+}
+
+include "envcommon" {
+  path = "${get_terragrunt_dir()}/common.hcl"   # a sibling
+}
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Include file parse error
 **Category:** configuration
 
-Syntax error in included file
+The included file was found and is not valid HCL, or is valid HCL that Terragrunt cannot use as
+a config.
 
 **Likely causes:**
-- HCL syntax error in include file
-- Invalid configuration structure
-- Encoding issues
+- A syntax error in the *included* file. The failure surfaces in the unit, so the file named in
+  the error is not always the file to fix — read the location line.
+- A `.hcl` file that is a values file or a fragment, not a Terragrunt config.
+- BOM or CRLF line endings from a Windows editor.
+
+**Solutions:**
+
+```bash
+# Validate the included file on its own, before the unit that includes it:
+terragrunt hcl validate --working-dir <dir-containing-the-included-file>
+terragrunt hcl fmt --check --diff
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Include merge conflict
 **Category:** configuration
 
-Cannot merge configurations from includes
+Two includes, or an include and the unit, define the same thing and the result is not what you
+expected.
+
+**The merge strategy is `shallow` unless you say otherwise**, and shallow means *replace*:
+
+| `merge_strategy` | effect |
+|---|---|
+| `shallow` (default) | attributes and blocks replaced wholesale by the child |
+| `deep` | maps and nested blocks merged key by key |
+| `no_merge` | the included config is parsed but not merged at all |
+
+**The exception that catches people:** under a shallow merge everything is replaced **except
+`dependencies` blocks** (the plural block, not `dependency`). Those are deep-merged — the lists
+of paths from every included config are concatenated rather than overridden.
 
 **Likely causes:**
-- Conflicting block definitions
-- Incompatible merge strategies
-- Duplicate keys with different values
+- A child setting one key of `inputs` and silently discarding the rest, because shallow replaces
+  the whole map. `merge_strategy = "deep"` is what you wanted.
+- Two `include` blocks with the same label. Each needs a distinct one; they merge by label.
+- Expecting `dependencies` to be replaced, and getting the union.
+
+**Solutions:**
+
+```hcl
+include "envcommon" {
+  path           = "${dirname(find_in_parent_folders("root.hcl"))}/_envcommon/app.hcl"
+  merge_strategy = "deep"
+}
+```
+
+```bash
+# The merged result, with everything resolved. Read this rather than reasoning about it:
+terragrunt render
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Include path traversal limit
 **Category:** configuration
 
-Exceeded limit searching for include file
+The same one-level rule as "Circular include detected", reached by climbing rather than looping.
+
+> **Terragrunt supports ONE level of `include`.** If a config you include has its own `include`
+> block, the run fails. Reproduced on 1.1.3:
+>
+> ```
+> a/b/terragrunt.hcl includes a/mid.hcl, which itself includes root.hcl.
+> Only one level of includes is allowed.
+> ```
+>
+> Tracked upstream as gruntwork-io/terragrunt#1566. Until it lands, a child must include every
+> file it needs **directly** — `include` blocks are additive and merge by label, so several
+> siblings are fine; a chain is not.
 
 **Likely causes:**
-- File not found in any parent directory
-- Traversal reached filesystem root
-- Fallback path not configured
+- A deep tree where each level includes the one above it, so a leaf is three or four hops from
+  the root config.
+- An include `path` built with several `..` segments that resolves outside the repo.
 
-## ERROR: Interpolation error
-**Category:** configuration
+**Solutions:**
 
-Error in variable interpolation or template
+```bash
+# What is including what? render resolves the whole graph and fails loudly if it cannot:
+terragrunt render
+```
 
-**Likely causes:**
-- Variable not defined
-- Invalid interpolation syntax
-- Circular reference in interpolation
+Anchor paths to a marker file rather than counting directories — `find_in_parent_folders("root.hcl")`
+holds when a unit moves; `../../../root.hcl` does not.
 
-## ERROR: Invalid attribute value
-**Category:** configuration
-
-Invalid or unsupported attribute in configuration
-
-**Likely causes:**
-- Attribute value is wrong type
-- Attribute not supported for this block
-- Typo in attribute name
-
-## ERROR: Invalid configuration block
-**Category:** configuration
-
-Invalid or unsupported block in terragrunt.hcl
-
-**Likely causes:**
-- Typo in block name
-- Block not supported in this version
-- Block in wrong location
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Invalid terraform source
 **Category:** configuration
@@ -802,32 +1002,101 @@ The terraform source URL format is invalid
 ## ERROR: Local evaluation error
 **Category:** configuration
 
-Error evaluating local variable expression
+A `locals` expression threw while being evaluated.
+
+Terragrunt evaluates locals in passes and reports a local it could not finish with the same
+wording it uses for a circular reference — `The local reference 'x' is not evaluated. Either it
+is not ready yet in the current pass, or there was an error evaluating it in an earlier stage.`
+**"Or there was an error" is the half people skip.** If the reference is not circular, something
+it calls failed.
 
 **Likely causes:**
-- Function call failed
-- Type error in expression
-- Null or undefined value
+- `read_terragrunt_config` pointed at a file that does not exist, or that fails to parse. The
+  failure is attributed to the local, not to the file.
+- `file()` or `yamldecode()` on a missing or malformed file.
+- `get_env("X")` with no default, where `X` is unset.
+- A function that is not available at this evaluation stage — `dependency` outputs are not
+  resolvable inside `locals`.
+
+**Solutions:**
+
+```hcl
+locals {
+  # Give the reads a default so a missing file is visible rather than fatal:
+  env_vars = read_terragrunt_config(find_in_parent_folders("env.hcl", "none.hcl"), {})
+  region   = get_env("AWS_REGION", "eu-central-1")
+}
+```
+
+```bash
+terragrunt render --log-level debug
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Local type error
 **Category:** configuration
 
-Local variable has wrong type
+A local holds a different type from the one the expression using it assumes.
 
 **Likely causes:**
-- Expression evaluates to unexpected type
-- Type conversion failed
-- Collection type mismatch
+- A value read from YAML or JSON arriving as a string when a number or bool was expected —
+  `yamldecode` preserves the source type, and `"true"` is not `true`.
+- A list where a map is expected, usually after a `for` expression.
+- `read_terragrunt_config` returning a whole config object where a scalar was wanted: the value
+  is under `.locals.<name>`, and the object itself is not a string.
+
+**Solutions:**
+
+```hcl
+locals {
+  raw     = yamldecode(file("${get_terragrunt_dir()}/config.yaml"))
+  enabled = tobool(local.raw.enabled)     # be explicit rather than hoping
+  count   = tonumber(local.raw.count)
+}
+```
+
+```bash
+# What type is it actually? render prints the resolved config:
+terragrunt render
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Locals merge error
 **Category:** configuration
 
-Error merging locals from includes
+An expectation that `locals` combine across files. **They do not merge, at all.**
+
+`merge_strategy` on an `include` governs attributes and blocks such as `inputs`, `remote_state`
+and `dependencies`. It does not give the child a merged `local.` namespace, and no strategy —
+`shallow`, `deep` or `no_merge` — changes that. `expose = true` makes the included config
+readable under `include.<label>.locals`, which is a separate namespace, not a merge.
 
 **Likely causes:**
-- Conflicting local definitions
-- Type incompatibility
-- Merge strategy not specified
+- Two `locals` blocks in the same file. That is a duplicate block, not a merge — put everything
+  in one.
+- Assuming `deep` merges locals. It does not.
+- Building a value from both parent and child locals and expecting one name to resolve to both.
+
+**Solutions:**
+
+```hcl
+include "root" {
+  path   = find_in_parent_folders("root.hcl")
+  expose = true
+}
+
+locals {
+  # Do the combining yourself, explicitly:
+  tags = merge(
+    include.root.locals.common_tags,
+    { Service = "checkout" },
+  )
+}
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Missing required input variable
 **Category:** configuration
@@ -895,45 +1164,46 @@ Remote state backend is not configured
 - Backend type not specified
 - Configuration incomplete
 
-## ERROR: Required attribute missing
-**Category:** configuration
-
-Required configuration attribute is not provided
-
-**Likely causes:**
-- Mandatory attribute not specified
-- Attribute removed in refactoring
-- Version upgrade changed requirements
-
-## ERROR: Syntax error in configuration
-**Category:** configuration
-
-HCL syntax error in terragrunt.hcl or .tf files
-
-**Likely causes:**
-- Missing closing braces or quotes
-- Invalid HCL syntax
-- Incorrect block structure
-
-## ERROR: Type mismatch error
-**Category:** configuration
-
-Value type does not match expected type
-
-**Likely causes:**
-- String provided where number expected
-- Incorrect collection type
-- Type conversion failed
-
 ## ERROR: Undefined local reference
 **Category:** configuration
 
-Referenced local variable is not defined
+`local.<name>` does not exist in this config.
+
+**A parent's `locals` are NOT inherited.** This is the cause most of the time, and nothing in
+the message hints at it. Including a config does not merge its `locals` into your `local.`
+namespace. Reproduced on 1.1.3 — a child including a root that defines `locals { region = ... }`:
+
+```
+Error: Unsupported attribute
+  on child/terragrunt.hcl line 3:
+   3: inputs = { r = local.region }
+```
+
+Set `expose = true` on the include and read it as `include.<label>.locals.<name>`, which is a
+different name from the one you were reaching for.
 
 **Likely causes:**
-- Local variable not defined in locals block
-- Typo in local variable name
-- Local defined in different scope
+- Expecting inheritance from an included config. See above.
+- A typo, or a local defined inside a *different* `locals` block in an included file.
+- Reading a value out of `read_terragrunt_config(...)` without the `.locals` hop:
+  it is `local.account_vars.locals.account_id`, not `local.account_vars.account_id`.
+
+**Solutions:**
+
+```hcl
+include "root" {
+  path   = find_in_parent_folders("root.hcl")
+  expose = true
+}
+
+locals {
+  region       = include.root.locals.region                    # from the include
+  account_vars = read_terragrunt_config(find_in_parent_folders("account.hcl"))
+  account_id   = local.account_vars.locals.account_id          # note the .locals hop
+}
+```
+
+Verified against terragrunt 1.1.3 and the docs of 2026-08-20.
 
 ## ERROR: Working directory error
 **Category:** configuration

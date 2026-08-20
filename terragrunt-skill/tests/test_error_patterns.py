@@ -10,6 +10,7 @@ tests assert the second number the skill advertises -- how many of those entries
 a fix -- because that is the one a reader acts on, and it is quoted in three places that have
 no mechanical relationship to the file.
 """
+import collections
 import re
 from pathlib import Path
 
@@ -95,3 +96,22 @@ def test_no_entry_teaches_a_command_the_installed_binary_rejects():
                 used.add(m.group(2))
     unknown = sorted(used - known)
     assert not unknown, f"error-patterns.md teaches unknown terragrunt subcommands: {unknown}"
+
+
+def test_the_category_index_counts_match_the_entries():
+    """The Categories block at the top is a second set of numbers about this file, and it went
+    stale the moment nine entries were folded away -- it still listed them by name. Same class
+    as the navigation-table counts in check_conventions.py: a number written beside the thing
+    it counts, with nothing tying the two together."""
+    text = PATTERNS.read_text(encoding="utf-8")
+    actual = collections.Counter()
+    for body in entries().values():
+        m = re.search(r"\*\*Category:\*\* (\w+)", body)
+        if m:
+            actual[m.group(1)] += 1
+    claimed = dict(re.findall(r"(?m)^- \*\*(\w+)\*\* \((\d+)\)", text))
+    assert claimed, "the Categories index is gone"
+    assert set(claimed) == set(actual), (
+        f"categories listed {sorted(claimed)} but entries use {sorted(actual)}")
+    for cat, n in claimed.items():
+        assert int(n) == actual[cat], f"index claims {n} {cat} entries; the file has {actual[cat]}"
