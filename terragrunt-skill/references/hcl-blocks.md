@@ -131,6 +131,40 @@ Only `dependency.<name>.outputs` is available — the old `dependency.<name>.inp
 accessor has been removed. A `dependency` block both creates a DAG ordering edge **and**
 exposes outputs; use `dependencies` (below) when you need ordering without outputs.
 
+**Every `dependency` label must be unique within a config file, and before v1.1.4 nothing told
+you otherwise.** Two blocks sharing a label parsed cleanly and every reference to that label
+resolved to **whichever block came last** — the earlier ones were silently overridden:
+
+```hcl
+dependency "vpc" {
+  config_path = "../vpc-us-east-1"
+}
+
+dependency "vpc" {
+  config_path = "../vpc-us-west-2"
+}
+
+inputs = {
+  # Reads ../vpc-us-west-2. The first block is dead, and nothing said so.
+  vpc_id = dependency.vpc.outputs.vpc_id
+}
+```
+
+v1.1.4 warns when it finds this, and makes it an error under the new strict control:
+
+```bash
+terragrunt run plan --strict-control duplicate-dependency-labels
+```
+
+```text
+/path/to/terragrunt.hcl: dependency vpc is declared more than once; every dependency needs an address of its own
+```
+
+Give each block its own label. **A configuration that was relying on the shadowing to select
+the last block should keep only that block** — renaming both labels changes which dependency
+the inputs read. On ≤1.1.3 this is silent, so check by eye when reviewing a config that
+declares many dependencies.
+
 *Simple dependency on VPC module*
 ```hcl
 dependency "vpc" {

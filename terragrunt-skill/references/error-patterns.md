@@ -5,9 +5,12 @@
 > 2026-02-22, five weeks before Terragrunt v1.0.0 existed. Three were written here
 > (both Azure entries, and `ParentFileNotFoundError`, which was reproduced on 1.1.3).
 > Thirty-seven have since been rewritten against the 1.1.3 binary and a dated docs snapshot,
-> and nine generic HCL entries were folded into one.
+> and nine generic HCL entries were folded into one. **Two were added on 2026-08-28 from the
+> v1.1.4 release notes** — the `depth=` git-source failure and the CAS local-source warning,
+> both of which were live and undocumented for four releases. Neither has been reproduced
+> against a binary; they are read from the changelog and labelled as such.
 >
-> **What that means for you.** Every entry names likely causes. **Only 49 carry a fix**, and an
+> **What that means for you.** Every entry names likely causes. **Of the 63 entries, only 51 carry a fix**, and an
 > entry with no `**Solutions:**` section has none to give — say so rather than improvising one.
 > An entry carrying a "Verified against terragrunt 1.1.3" line was checked against the binary
 > on that date; the rest were not, and may describe a pre-1.0 world. Flag and avoid pre-1.0
@@ -32,7 +35,7 @@ cause.
 - **backend** (5): S3 bucket does not exist, Access denied to backend, GCS bucket not found, Azure storage account not found, Azure backend 403 (shared key disabled / missing RBAC)
 - **provider** (1): azurerm provider requires subscription_id (v4+)
 - **configuration** (31): HCL that will not parse or evaluate, the seven `include` entries, the five `generate` entries, the five `locals` entries, the seven hook entries, No Terraform configuration files found, Missing required input variable, Remote state configuration missing, Invalid terraform source, Working directory error, ParentFileNotFoundError on a file that sits beside the config
-- **dependency** (13): Circular dependency detected, Module not found, Could not download source, Git authentication failed, Git ref not found, Module subdirectory not found, Module registry unavailable, Module checksum mismatch…
+- **dependency** (15): Circular dependency detected, Module not found, Could not download source, `invalid repository name` from a `depth=` query parameter (v1.1.0–1.1.3), `CAS processing failed … source escapes repository root` (v1.1.0–1.1.3), Git authentication failed, Git ref not found, Module subdirectory not found, Module registry unavailable, Module checksum mismatch…
 - **network** (2): Network timeout, Connection refused
 - **state** (3): Error acquiring state lock, Backend configuration changed, Failed to get existing workspaces
 - **terraform** (3): Terraform version constraint not met, Provider not found, Provider version constraint
@@ -1264,6 +1267,57 @@ Failed to download module source code
 - Network connectivity issues
 - Invalid or inaccessible URL
 - Authentication required but not provided
+
+## ERROR: invalid repository name (a `depth` query parameter on a git source)
+**Category:** dependency
+
+`git` rejects the URL Terragrunt handed it, naming a repository that ends in `.git?depth=1`.
+**Read from the v1.1.4 release notes on 2026-08-28 and NOT reproduced against a binary** —
+this entry carries less weight than one marked verified. **Live in every release from v1.1.0 to
+v1.1.3 inclusive.**
+
+**Likely causes:**
+- **The `source` carries the go-getter `depth` query parameter**, e.g.
+  `git::https://github.com/org/vpc.git?depth=1&ref=v5.21.0`. Since v1.1.0, CAS is the default
+  path for git sources; it lifts `ref` out of the URL but left `depth` in place, so `git`
+  receives `...vpc.git?depth=1` and reads the whole thing as a repository name. A `depth` with
+  no `ref` fails the same way.
+- **This does not look like a version problem**, which is why it survived four releases. The
+  error names your URL, so the natural reading is that the source is wrong.
+
+**Solutions:**
+- **Delete the `depth` parameter.** It has no effect on a CAS clone in any case — the clone
+  depth comes from `--cas-clone-depth` (default `1`, `-1` for full history). This fixes it
+  without upgrading, on every affected version.
+- Or upgrade to **v1.1.4+**, which strips `depth` before invoking `git`, with or without a
+  `ref`.
+- If you need a specific depth, set `--cas-clone-depth`; a `depth` on the source URL is never
+  applied to a CAS clone.
+
+## ERROR: CAS processing failed ... source escapes repository root
+**Category:** dependency
+
+Logged when generating a stack from a unit whose **local** source has already been
+initialised. The run does not fail — it silently falls back to the slower standard copy, so
+the symptom is usually "stack generation got slow" plus this line in the log. **Read from the
+v1.1.4 release notes on 2026-08-28 and NOT reproduced against a binary. Live from v1.1.0 to
+v1.1.3 inclusive.**
+
+**Likely causes:**
+- **Provider caching, not the source layout.** Both the Provider Cache Server and the
+  Automatic Provider Cache Dir leave the plugins under `.terraform` pointing into a shared
+  cache *outside* the source directory. CAS read those links as the source reaching outside
+  itself and refused to copy them, which is the "escapes repository root" wording.
+- Running `tofu init` in a source directory was enough to trigger it, and also changed that
+  source's CAS key.
+
+**Solutions:**
+- Upgrade to **v1.1.4+**. CAS now leaves `.terraform` and `.terragrunt-cache` out of local
+  sources — keeping `.terraform.lock.hcl` and everything else — and OpenTofu, Terraform and
+  Terragrunt rebuild both directories on demand, so units and stacks no longer receive a stale
+  copy of either.
+- Before upgrading, the workarounds are to stop caching providers or to remove `.terraform`
+  from the source before generating. Both cost more than the upgrade.
 
 ## ERROR: Git authentication failed
 **Category:** dependency

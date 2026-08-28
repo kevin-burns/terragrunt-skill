@@ -64,6 +64,13 @@ GATES = (
         "--no-dependency-outputs                   --experiment optional-dependency-outputs",
         "terragrunt browse                         --experiment browse-tui",
     )),
+    ("1.1.4", "opt-in strict control, and two CAS repairs", (
+        "duplicate dependency labels warn by default; they are an ERROR under "
+        "--strict-control duplicate-dependency-labels",
+        "terragrunt scaffold opens the Catalog TUI form instead of writing # TODO",
+        "git source ?depth= works again (broken 1.1.0-1.1.3)",
+        "CAS reads an already-initialized local source again (broken 1.1.0-1.1.3)",
+    )),
 )
 
 # Changes that break a working configuration on upgrade WITHOUT anyone enabling anything.
@@ -77,6 +84,26 @@ HAZARDS = {
         "and failed with AccessDenied. The error points at the trust policy; editing the "
         "trust policy is the wrong fix. Fixed in 1.1.2 -- do not sit on 1.1.1.",
     )),
+    # Entered when CAS became the default path for git sources in 1.1.0, and both
+    # went unnoticed for four releases. They are reported for anyone still on
+    # 1.1.0-1.1.3, which is the whole point of keying hazards by the version you
+    # cross INTO rather than by the version that fixed them.
+    "1.1.0": ("1.1.4", (
+        "A terraform.source (or stack source) URL carrying the go-getter depth query "
+        "parameter -- ...vpc.git?depth=1&ref=v5.21.0 -- FAILS TO DOWNLOAD. CAS lifts ref "
+        "out of the URL but left depth in place, so git receives ...vpc.git?depth=1 and "
+        "rejects it as an invalid repository name. A depth with no ref fails the same way. "
+        "Clone depth comes from --cas-clone-depth (default 1) and a depth on the URL is "
+        "never applied to a CAS clone, so the parameter can simply be deleted. "
+        "Fixed in 1.1.4.",
+        "With CAS enabled, reading a LOCAL source that has already been initialized fails "
+        "and silently falls back to the slower standard copy; generating a stack from such "
+        "a unit logs 'CAS processing failed ... source escapes repository root'. The cause "
+        "is provider caching -- both the Provider Cache Server and the Automatic Provider "
+        "Cache Dir leave .terraform pointing outside the source, which CAS reads as the "
+        "source escaping itself. Fixed in 1.1.4, which leaves .terraform and "
+        ".terragrunt-cache out of local sources while keeping .terraform.lock.hcl.",
+    )),
     "1.1.3": (None, (
         "--filter now reserves ( and ) for the bounded-discovery boundary operand, and the "
         "reservation applies whether or not the experiment is enabled. "
@@ -86,6 +113,19 @@ HAZARDS = {
         "A --filter query beginning with a negation used to be treated as wholly "
         "exclusionary, so positive expressions after it did not restrict the selection. "
         "They now do, which changes what existing queries return.",
+    )),
+    "1.1.4": (None, (
+        "When --tf-path (TG_TF_PATH) is NOT set, Terragrunt no longer runs 'tofu -version' "
+        "to choose the binary it wraps. It now selects tofu whenever tofu is on PATH. On a "
+        "machine where tofu is present but cannot run, Terragrunt used to fall back to "
+        "terraform silently and now reports the failure instead. Set --tf-path or "
+        "TG_TF_PATH explicitly if you were relying on that fallback.",
+        "terragrunt scaffold is now INTERACTIVE from a terminal: it opens the Catalog TUI "
+        "form and collects values instead of writing # TODO placeholders, and dismissing "
+        "the form with esc writes NOTHING. The old behaviour still applies under "
+        "--non-interactive, when stdin is not a terminal, or when the source asks for "
+        "nothing -- so CI is unaffected, but a human following a scripted runbook, or an "
+        "agent driving a PTY, will meet a form where a file used to appear.",
     )),
 }
 

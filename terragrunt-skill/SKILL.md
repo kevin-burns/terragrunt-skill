@@ -115,6 +115,51 @@ read ONLY the listed reference(s), then act. References are grep-friendly — pr
    functional (see `references/azure-backend.md` — this reverses a long-standing "Terragrunt
    never bootstraps Azure state" rule), and `oci` gained CAS caching plus Docker
    credential-helper auth. These references cover only some of them, so an unfamiliar
+
+   **v1.1.4 graduated nothing either, and its most important content is two bugs it FIXES that
+   have been live since v1.1.0.** Both entered when CAS became the default path for git
+   sources, and both went four releases unnoticed because neither reads like a Terragrunt
+   problem:
+   - **A `source` URL carrying the go-getter `depth` query parameter has not downloaded since
+     v1.1.0.** `...vpc.git?depth=1&ref=v5.21.0` — CAS lifts `ref` out of the URL but left
+     `depth` in place, so `git` receives `...vpc.git?depth=1` and rejects it as an invalid
+     repository name. A `depth` with no `ref` fails identically. **This presents as "my module
+     source is wrong", not "my Terragrunt is old"**, which is exactly why it is worth knowing.
+     The clone depth comes from `--cas-clone-depth` (default 1) and a `depth` on the URL is
+     *never* applied to a CAS clone, so the parameter can simply be deleted — that fixes it on
+     every version, without upgrading.
+   - **With CAS on, reading a local source that has already been initialised** failed and fell
+     back to the slower standard copy, logging `CAS processing failed ... source escapes
+     repository root` when generating a stack. Provider caching was the cause: both the
+     Provider Cache Server and the Automatic Provider Cache Dir leave `.terraform` pointing
+     into a shared cache outside the source, and CAS read that as the source escaping itself.
+     v1.1.4 leaves `.terraform` and `.terragrunt-cache` out of local sources while keeping
+     `.terraform.lock.hcl`, so `tofu init` in a source directory no longer changes its CAS key.
+
+   **THE ONE THAT BITES WITHOUT OPTING IN, this release: binary selection when `--tf-path` is
+   unset.** Terragrunt used to choose between `tofu` and `terraform` by running `tofu -version`,
+   a process launch on every command including `find` and `list` that never run the binary.
+   That launch is gone — `terragrunt --version` benchmarks ~1.7× faster — but the selection
+   changed with it. **Terragrunt now picks `tofu` whenever `tofu` is on `PATH`, and reports the
+   failure if it cannot run, where it previously fell back to `terraform` silently.** A machine
+   with a broken or half-installed `tofu` stops working on upgrade. Set `--tf-path` or
+   `TG_TF_PATH` explicitly if you were relying on that fallback.
+
+   **`terragrunt scaffold` is now interactive from a terminal.** It opens the same form the
+   Catalog TUI uses instead of writing `# TODO` placeholders — listing a source's variables for
+   a module or template, and the `values.*` references a unit or stack makes, which are written
+   to `terragrunt.values.hcl`. **Dismissing it with `esc` writes nothing at all.** The old
+   placeholder behaviour still applies under `--non-interactive`, when `stdin` is not a
+   terminal, or when the source asks for nothing — so CI is unchanged, but **a scripted runbook
+   or an agent driving a PTY will meet a form where a file used to appear.** Pass
+   `--non-interactive` in anything automated.
+
+   **v1.1.4 added one strict control: `duplicate-dependency-labels`.** Two `dependency` blocks
+   sharing a label parsed without error and silently resolved every reference to whichever came
+   last. That now warns, and is an error under
+   `--strict-control duplicate-dependency-labels`. See `references/hcl-blocks.md` under
+   `## BLOCK: dependency`.
+
    `--experiment` value
    is not evidence that it is wrong — look it up rather than flagging it. For anything newer,
    niche, or not found in the references, use the C7 search skill (Context7) or fetch
@@ -153,7 +198,7 @@ the fastest route to an answer is the grep handle, not the filename.
 
 | Reference | Holds | Entries | Grep handle |
 |---|---|---|---|
-| `error-patterns.md` | diagnosed errors: likely causes for every one, a fix for 49 | 61 | `^## ERROR:` |
+| `error-patterns.md` | diagnosed errors: likely causes for every one, a fix for 51 | 63 | `^## ERROR:` |
 | `functions.md` | built-in functions by category | 31 | `^## FUNCTION:` |
 | `best-practices.md` | practices, plus comparisons and decision guides | 29 / 7 / 3 | `^## PRACTICE:` `^## COMPARISON:` `^## DECISION:` |
 | `cli-reference.md` | the 1.x command tree and the `--filter` system | 24 | `^## COMMAND:` |
@@ -176,7 +221,7 @@ Counts are verified against the files, not asserted: regenerate with
 - `references/functions.md` — built-in functions by category. `grep '^## FUNCTION: get_env'`
 - `references/cli-reference.md` — full 1.0 command tree + `--filter` system.
   `grep '^## COMMAND: stack run'`
-- `references/error-patterns.md` — 61 diagnosed errors. Every one names likely causes; **49
+- `references/error-patterns.md` — 63 diagnosed errors. Every one names likely causes; **51
   carry a fix**, and an entry with no `**Solutions:**` section has none to give — say so
   rather than improvising one. Grep error keywords first:
   `grep -in 'state lock' references/error-patterns.md`

@@ -29,10 +29,22 @@ def test_a_1_0_build_is_told_not_to_emit_the_1_1_0_surface():
     assert "update_source_with_cas" in blocked
 
 
-def test_the_installed_generation_reaches_every_recorded_gate():
-    out = lines_for("1.1.3")
+def test_the_newest_recorded_gate_is_reached_by_its_own_version():
+    """Derived from GATES, not pinned. This test used to hardcode 1.1.3 while the comment
+    above it claimed nothing here depends on the current release -- so it failed the day
+    1.1.4 was added, for no reason except its own pin."""
+    newest = preflight.GATES[-1][0]
+    out = lines_for(newest)
     assert "SAFE TO EMIT" in out
     assert "DO NOT EMIT" not in out
+
+
+def test_an_older_build_is_told_what_the_newest_gate_withholds():
+    """The inverse, and the one that actually protects a user: the version before the
+    newest gate must be told it does not reach it."""
+    out = lines_for("1.1.3")
+    assert "DO NOT EMIT" in out
+    assert preflight.GATES[-1][0] in out.split("DO NOT EMIT")[1]
 
 
 def test_experiment_gated_features_name_their_flag():
@@ -64,6 +76,36 @@ def test_a_fixed_hazard_stops_being_reported_once_you_are_past_the_fix():
 
 def test_a_build_older_than_a_hazard_does_not_see_it():
     assert "iam_role" not in lines_for("1.1.0")
+
+
+def test_the_cas_depth_hazard_spans_four_releases_and_then_stops():
+    """Entered when CAS became the default git path in 1.1.0 and not fixed until 1.1.4.
+    It is the longest-lived hazard recorded here, and the one most likely to be read as
+    'my module source is wrong' rather than 'my Terragrunt is old'."""
+    for version in ("1.1.0", "1.1.1", "1.1.2", "1.1.3"):
+        out = lines_for(version)
+        assert "depth" in out, version
+        assert "invalid repository name" in out, version
+    assert "invalid repository name" not in lines_for("1.1.4")
+
+
+def test_the_cas_local_source_hazard_clears_at_the_same_release():
+    assert "source escapes repository root" in lines_for("1.1.2")
+    assert "source escapes repository root" not in lines_for("1.1.4")
+
+
+def test_the_tf_path_fallback_change_is_reported_on_1_1_4():
+    """Nothing is enabled and no config changes -- a machine with a broken tofu on PATH
+    simply stops working. That is the definition of an upgrade hazard here."""
+    out = lines_for("1.1.4")
+    assert "UPGRADE HAZARDS" in out
+    assert "TG_TF_PATH" in out
+
+
+def test_the_scaffold_form_change_is_reported_on_1_1_4():
+    out = lines_for("1.1.4")
+    assert "scaffold" in out
+    assert "--non-interactive" in out
 
 
 # ---------------------------------------------------------------------------

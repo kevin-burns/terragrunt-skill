@@ -232,6 +232,19 @@ and a `ref` on the source URL pointing at the module's latest release tag.
 You can also set a catalog-wide default with the **`default_template`** option in the catalog
 configuration, which applies to every module scaffolded from that catalog.
 
+**The command became interactive in v1.1.4.** Until then, scaffolding from the command line
+wrote `# TODO` placeholders for every input and left you to fill them in, while scaffolding the
+same component from the Catalog TUI opened a form. `terragrunt scaffold` now opens **that same
+form**: for a module or a template it lists the source's variables; for a unit or a stack it
+lists the `values.*` references its configuration makes, which are written to
+`terragrunt.values.hcl`. **Dismissing the form with `esc` writes nothing.**
+
+The form is skipped — and the placeholders written exactly as before — when you pass
+`--non-interactive`, when `stdin` is not a terminal, or when the source asks for nothing. **A
+scaffold in a CI job, or one run by another program, therefore behaves as it always did.** The
+case that changes is a human following a scripted runbook, or an agent driving a PTY: pass
+`--non-interactive` in anything automated that expects a file to appear.
+
 **Options** — verified against docs.terragrunt.com on 2026-08-19:
 - `--var`: set a template variable (repeatable)
 - `--var-file`: supply variable values from a file
@@ -800,6 +813,14 @@ authored.
 - `--parallelism`: Maximum parallel operations
 - `--filter`: Target a subset (needs `type=stack` to select stacks)
 - `--no-cas` / `--cas-clone-depth`: CAS controls. CAS is **GA and on by default since v1.1.0**; `--no-cas` (env `TG_NO_CAS`) opts out but errors if any block sets `update_source_with_cas = true`. `--cas-clone-depth` default 1 (`-1` = full history).
+- `--tf-path` (env `TG_TF_PATH`): the binary Terragrunt wraps. **Leaving it unset changed
+  meaning in v1.1.4.** Terragrunt used to decide by running `tofu -version` — a process launch
+  on every command, including `find` and `list`, which never run the binary at all. That launch
+  is gone (`terragrunt --version` benchmarks ~1.7× faster), and selection is now simply "`tofu`
+  if it is on `PATH`, otherwise `terraform`". **The consequence: a `tofu` that is present but
+  cannot run is now selected and its failure reported, where ≤1.1.3 fell back to `terraform`
+  silently.** Set this flag, or `TG_TF_PATH`, wherever you were relying on that fallback — a
+  half-installed `tofu` on a build image is the shape that bites.
 
 *Materialize the stack into `.terragrunt-stack/`*
 ```bash
