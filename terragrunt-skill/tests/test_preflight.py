@@ -1,12 +1,12 @@
-import sys
+import importlib.util
 from pathlib import Path
 
-# No pyproject.toml pythonpath config in this skill, so the scripts dir goes on sys.path
-# here -- keeps the test file self-contained, same as ghost-publish's suite.
+# No pyproject.toml pythonpath config in this skill, so the script is loaded by path --
+# keeps the test file self-contained without a sys.path edit or an import-order exemption.
 SCRIPTS_DIR = Path(__file__).parent.parent / "scripts"
-sys.path.insert(0, str(SCRIPTS_DIR))
-
-import preflight  # noqa: E402
+_spec = importlib.util.spec_from_file_location("preflight", SCRIPTS_DIR / "preflight.py")
+preflight = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(preflight)
 
 
 def lines_for(version: str) -> str:
@@ -106,6 +106,52 @@ def test_the_scaffold_form_change_is_reported_on_1_1_4():
     out = lines_for("1.1.4")
     assert "scaffold" in out
     assert "--non-interactive" in out
+
+
+def test_the_base64gzip_replacement_is_reported_on_1_1_4_and_cleared_by_1_1_5():
+    """Two hazards entered in 1.1.4: one permanent, one fixed a release later. The fixed one
+    must stop being reported while the permanent one stays."""
+    on_114 = lines_for("1.1.4")
+    assert "base64gzip()" in on_114 and "REPLACEMENT" in on_114
+    on_115 = lines_for("1.1.5")
+    assert "planned replacements" in on_115  # the 1.1.5 gate row explains the fix
+    assert "REPLACEMENT" not in on_115
+    assert "TG_TF_PATH" in on_115  # the permanent 1.1.4 hazard is still in effect
+
+
+def test_the_repo_root_change_is_reported_from_1_1_5():
+    assert "GIT_DIR" in lines_for("1.1.5")
+    assert "GIT_DIR" not in lines_for("1.1.4")
+
+
+def test_generated_file_permissions_and_flag_precedence_are_reported_on_1_1_5():
+    out = lines_for("1.1.6")
+    assert "0600" in out
+    assert "TERRAGRUNT_LOG_LEVEL" in out
+
+
+def test_offline_cas_is_withheld_below_1_1_5():
+    out = lines_for("1.1.4")
+    withheld = out.split("DO NOT EMIT", 1)[1]
+    assert "offline-cas" in withheld
+
+
+def test_a_1_1_x_build_is_warned_about_1_2_without_being_told_to_emit_it():
+    """1.2.0 is a release candidate: the plan-visible changes are worth knowing before the
+    upgrade, and none of it is a gate."""
+    out = lines_for("1.1.6")
+    assert "COMING IN 1.2.0" in out and "NOT A GATE" in out
+    assert "RootAccess" in out and "base64gzip_compat" in out
+    assert "SAFE TO EMIT" in out.split("COMING IN", 1)[0]
+    assert "RootAccess" not in out.split("COMING IN", 1)[0]
+
+
+def test_a_1_2_release_candidate_is_treated_as_unrecorded_not_as_covered():
+    """rc1 parses as 1.2.0. It must get the ahead-of-every-gate warning, and the 'coming'
+    block must not repeat as if it were still in the future."""
+    out = lines_for("terragrunt version v1.2.0-rc1")
+    assert "ahead of every gate" in out
+    assert "COMING IN" not in out
 
 
 # ---------------------------------------------------------------------------

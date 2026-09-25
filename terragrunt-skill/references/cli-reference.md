@@ -812,7 +812,7 @@ authored.
 - `--no-stack-validate`: Skip directory/config validation of the generated stack
 - `--parallelism`: Maximum parallel operations
 - `--filter`: Target a subset (needs `type=stack` to select stacks)
-- `--no-cas` / `--cas-clone-depth`: CAS controls. CAS is **GA and on by default since v1.1.0**; `--no-cas` (env `TG_NO_CAS`) opts out but errors if any block sets `update_source_with_cas = true`. `--cas-clone-depth` default 1 (`-1` = full history).
+- `--no-cas` / `--cas-clone-depth`: CAS controls. CAS is **GA and on by default since v1.1.0**; `--no-cas` (env `TG_NO_CAS`) opts out but errors if any block sets `update_source_with_cas = true`. `--cas-clone-depth` default 1 (`-1` = full history). **v1.1.5+, behind `--experiment offline-cas`:** the CAS records each remote probe answer (24h for a pinned revision: a semver tag, an S3 object version, an OCI manifest digest or an exact registry module version; re-probed every run for a changeable source such as a git branch or an OCI tag). `--cas-offline` never contacts a remote and errors on anything missing; `--cas-refresh` ignores recorded answers for one run; `--cas-probe-ttl 10m` trusts a changeable source's answer for that long.
 - `--tf-path` (env `TG_TF_PATH`): the binary Terragrunt wraps. **Leaving it unset changed
   meaning in v1.1.4.** Terragrunt used to decide by running `tofu -version` — a process launch
   on every command, including `find` and `list`, which never run the binary at all. That launch

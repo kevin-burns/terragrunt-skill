@@ -160,7 +160,55 @@ read ONLY the listed reference(s), then act. References are grep-friendly — pr
    `--strict-control duplicate-dependency-labels`. See `references/hcl-blocks.md` under
    `## BLOCK: dependency`.
 
-   `--experiment` value
+   **v1.1.5 graduated nothing, is mostly performance, and carries four behaviour changes.**
+   - **`base64gzip()` returns the v1.1.3 bytes again.** v1.1.4 was built with Go 1.27, which
+     changed the encoded bytes, so a resource comparing them (an EC2 instance with
+     `user_data_base64` and `user_data_replace_on_change = true`) **planned a replacement** on
+     upgrade. **Do not recommend v1.1.4 wherever `base64gzip()` feeds such a resource.** v1.1.5
+     warns once per run that this is legacy behaviour. `base64gzip_compat()` (behind
+     `--experiment base64gzip-compat`) keeps the v1.1.3 bytes permanently.
+   - **`get_repo_root()` and friends no longer run `git`.** They look for a `.git` entry
+     themselves, so `GIT_DIR`, `GIT_WORK_TREE` and `core.worktree` are **ignored**, and the
+     `safe.directory` ownership check is not applied. `GIT_CEILING_DIRECTORIES` still works. A
+     config that relied on those Git settings to find the root now finds a different one.
+   - **Files from `generate` blocks are created `0600`, not `0644`.** Anything that expected
+     another user or group to read a generated file loses access.
+   - **A current flag name now beats its deprecated name at the same level.** Before,
+     `TERRAGRUNT_LOG_LEVEL=debug` overrode `TG_LOG_LEVEL=info` set beside it. A CLI argument still
+     beats an environment variable under either name.
+   It also extended `duplicate-dependency-labels` to **two labels pointing at the same
+   `config_path`**, which drift apart as soon as one gains `mock_outputs`. It added two
+   experiments: `offline-cas` (the CAS records probe answers; unlocks `--cas-offline`,
+   `--cas-refresh` and `--cas-probe-ttl`) and `base64gzip-compat`. `tg-login` is reserved and
+   does nothing yet. `run --all` over units sharing one git module now makes one remote probe,
+   not one per unit. That is performance only and needs no advice.
+
+   **v1.1.6 is one Windows fix**: `find`, `list` and `browse` with a Git filter found nested units
+   again. No new surface.
+
+   **v1.2.0 is a release candidate (rc1, 2026-09-24), not a release.** Keep generating for the
+   v1.1.x gates above until the preflight says 1.2.0 is installed and stable. But warn about what
+   the upgrade changes, because two of the changes show up in a plan:
+   - **Eleven experiments graduate to on-by-default:** `azure-backend`, `block-iteration`,
+     `bounded-discovery`, `catalog-format`, `dependency-fetch-output-from-state`,
+     `mutable-generate`, `oci`, `optional-dependency-outputs`, `optional-hooks`, `profiling`,
+     `version-attribute`. Their `--experiment` flags then only warn. Once 1.2.0 is stable,
+     advice above that says "opt-in, gate at v1.1.x" becomes wrong for these eleven.
+   - **Dependency outputs are read straight from S3, GCS or azurerm state by default**, falling
+     back to `output -json`. `--no-dependency-fetch-output-from-state` forces the old path.
+   - **`base64gzip()` switches to the Go 1.27 bytes**, so the replacement described under v1.1.5
+     comes back on purpose. Where the encoded value must stay stable, use `base64gzip_compat()`.
+   - **S3 state bucket bootstrap no longer adds the `RootAccess` policy statement**, which
+     granted `s3:*` to the whole account. `skip_bucket_root_access` is deprecated; the opt-in is
+     `enable_bucket_root_access = true`. Buckets that already have the statement keep it.
+   - **For agents:** an `mcp-command` experiment serves Terragrunt (units, dependency graph,
+     validation, run order, outputs) over MCP and refuses to start subprocesses unless you pass
+     `--allow=exec`. There is also a public, version-pinned **Terragrunt docs MCP server** at
+     `https://mcp.docs.terragrunt.com/mcp` (public beta), a first-party source for the "look it
+     up" rule below.
+   `scripts/preflight.py` prints all of this under COMING IN 1.2.0 on any v1.1.x build.
+
+   These references cover only some of the active experiments, so an unfamiliar `--experiment` value
    is not evidence that it is wrong — look it up rather than flagging it. For anything newer,
    niche, or not found in the references, use the C7 search skill (Context7) or fetch
    docs.terragrunt.com directly — do not guess.

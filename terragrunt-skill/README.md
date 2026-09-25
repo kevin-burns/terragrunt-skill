@@ -71,8 +71,9 @@ skimming it is exactly how the above was nearly missed.
   backends and providers, `[BRACKET]` elsewhere) and all of them must be replaced before
   anything is presented. It will ask, or use obvious dummies labelled as such, rather than
   producing a plausible-looking account ID or secret.
-- **It does not cover every experiment.** Eighteen were active as of v1.1.3 and these
-  references cover only some. An unfamiliar `--experiment` value is *not* evidence that it
+- **It does not cover every experiment.** Eighteen were active as of v1.1.3, v1.1.5 added
+  `offline-cas`, `base64gzip-compat` and a reserved `tg-login`, and these references cover
+  only some. An unfamiliar `--experiment` value is *not* evidence that it
   is wrong — look it up rather than flagging it.
 - **It does not assume OpenTofu or Terraform.** Terragrunt orchestrates either; the skill
   reads your repo for the signal (`.terraform-version`, `terraform_binary`, provider

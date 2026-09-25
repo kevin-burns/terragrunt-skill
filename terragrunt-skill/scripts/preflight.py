@@ -71,24 +71,37 @@ GATES = (
         "git source ?depth= works again (broken 1.1.0-1.1.3)",
         "CAS reads an already-initialized local source again (broken 1.1.0-1.1.3)",
     )),
+    ("1.1.5", "opt-in experiments, and a wider strict control", (
+        "duplicate-dependency-labels also catches two labels sharing one config_path",
+        "CAS records probe answers; --cas-offline, --cas-refresh, --cas-probe-ttl "
+        "--experiment offline-cas",
+        "base64gzip_compat() keeps the v1.1.3 bytes permanently "
+        "--experiment base64gzip-compat",
+        "base64gzip() returns the v1.1.3 bytes again (the v1.1.4 bytes planned replacements)",
+    )),
+    ("1.1.6", "advice, not syntax", (
+        "Windows: find / list / browse with a Git filter find nested units again",
+    )),
 )
 
 # Changes that break a working configuration on upgrade WITHOUT anyone enabling anything.
 # This is the column a version number cannot give you, and the reason this file is not just
-# a comparison. Keyed by the version you are crossing INTO; the second element is the version
-# that FIXED it, or None if it is permanent. A hazard that was later fixed must stop being
+# a comparison. Keyed by the version you are crossing INTO. Each version holds one or more
+# (fixed_in, texts) groups -- fixed_in is the version that FIXED the group, or None if it is
+# permanent. Groups, not a single pair, because v1.1.4 brought a permanent change and a
+# later-fixed one in the same release. A hazard that was later fixed must stop being
 # reported once you are past the fix, or the report cries wolf and stops being read.
 HAZARDS = {
-    "1.1.1": ("1.1.2", (
+    "1.1.1": (("1.1.2", (
         "iam_role / --iam-assume-role with static AWS credentials assumed the role twice "
         "and failed with AccessDenied. The error points at the trust policy; editing the "
         "trust policy is the wrong fix. Fixed in 1.1.2 -- do not sit on 1.1.1.",
-    )),
+    )),),
     # Entered when CAS became the default path for git sources in 1.1.0, and both
     # went unnoticed for four releases. They are reported for anyone still on
     # 1.1.0-1.1.3, which is the whole point of keying hazards by the version you
     # cross INTO rather than by the version that fixed them.
-    "1.1.0": ("1.1.4", (
+    "1.1.0": (("1.1.4", (
         "A terraform.source (or stack source) URL carrying the go-getter depth query "
         "parameter -- ...vpc.git?depth=1&ref=v5.21.0 -- FAILS TO DOWNLOAD. CAS lifts ref "
         "out of the URL but left depth in place, so git receives ...vpc.git?depth=1 and "
@@ -103,8 +116,8 @@ HAZARDS = {
         "Cache Dir leave .terraform pointing outside the source, which CAS reads as the "
         "source escaping itself. Fixed in 1.1.4, which leaves .terraform and "
         ".terragrunt-cache out of local sources while keeping .terraform.lock.hcl.",
-    )),
-    "1.1.3": (None, (
+    )),),
+    "1.1.3": ((None, (
         "--filter now reserves ( and ) for the bounded-discovery boundary operand, and the "
         "reservation applies whether or not the experiment is enabled. "
         "--filter '1...(foo | bar)' is now rejected as a malformed boundary. Wrap names or "
@@ -113,8 +126,8 @@ HAZARDS = {
         "A --filter query beginning with a negation used to be treated as wholly "
         "exclusionary, so positive expressions after it did not restrict the selection. "
         "They now do, which changes what existing queries return.",
-    )),
-    "1.1.4": (None, (
+    )),),
+    "1.1.4": ((None, (
         "When --tf-path (TG_TF_PATH) is NOT set, Terragrunt no longer runs 'tofu -version' "
         "to choose the binary it wraps. It now selects tofu whenever tofu is on PATH. On a "
         "machine where tofu is present but cannot run, Terragrunt used to fall back to "
@@ -126,8 +139,46 @@ HAZARDS = {
         "--non-interactive, when stdin is not a terminal, or when the source asks for "
         "nothing -- so CI is unaffected, but a human following a scripted runbook, or an "
         "agent driving a PTY, will meet a form where a file used to appear.",
-    )),
+    )), ("1.1.5", (
+        "base64gzip() returns DIFFERENT BYTES (v1.1.4 was built with Go 1.27). They decompress "
+        "to the same value, but a resource comparing the encoded value -- an EC2 instance with "
+        "user_data_base64 and user_data_replace_on_change = true -- plans a REPLACEMENT. "
+        "Fixed in 1.1.5, which restores the v1.1.3 bytes. Do not apply a plan on 1.1.4 that "
+        "replaces an instance for no reason you can name.",
+    ))),
+    "1.1.5": ((None, (
+        "get_repo_root(), get_path_from_repo_root() and get_path_to_repo_root() no longer run "
+        "git. They look for a .git entry themselves, so GIT_DIR, GIT_WORK_TREE and "
+        "core.worktree are IGNORED and the safe.directory ownership check is not applied "
+        "(GIT_CEILING_DIRECTORIES still works). A config relying on those settings resolves a "
+        "different root.",
+        "Files written by generate blocks are created 0600, not 0644. Anything that expected "
+        "another user or group to read a generated file loses access.",
+        "A current flag or env var name now beats its deprecated name at the same level: "
+        "TG_LOG_LEVEL=info is no longer overridden by TERRAGRUNT_LOG_LEVEL=debug beside it. "
+        "A CLI argument still beats an environment variable under either name.",
+    )),),
 }
+
+# A RELEASE CANDIDATE, not a release. Kept apart from GATES on purpose: a gate says "safe to
+# emit", and nothing in an RC is. Printed as a warning on every build below it, so an upgrade
+# is planned rather than discovered. When 1.2.0 ships stable, move the graduations into a GATES
+# row, the plan-visible changes into HAZARDS, and delete this block.
+UPCOMING = ("1.2.0", "release candidate rc1, 2026-09-24", (
+    "Eleven experiments graduate to on-by-default: azure-backend, block-iteration, "
+    "bounded-discovery, catalog-format, dependency-fetch-output-from-state, mutable-generate, "
+    "oci, optional-dependency-outputs, optional-hooks, profiling, version-attribute. Their "
+    "--experiment flags then only warn.",
+    "Dependency outputs are read straight from S3 / GCS / azurerm state by default "
+    "(--no-dependency-fetch-output-from-state forces tofu output -json).",
+    "PLAN-VISIBLE: base64gzip() switches to the Go 1.27 bytes, so resources comparing the "
+    "encoded value plan a replacement. base64gzip_compat() keeps the old bytes.",
+    "PLAN-VISIBLE: S3 state bucket bootstrap no longer adds the RootAccess policy statement "
+    "(s3:* for the whole account). skip_bucket_root_access is deprecated; opt in with "
+    "enable_bucket_root_access = true. Existing buckets keep the statement.",
+    "For agents: mcp-command experiment (terragrunt mcp; no subprocesses without --allow=exec), "
+    "and the public docs MCP server at https://mcp.docs.terragrunt.com/mcp (beta).",
+))
 
 VERSION_RE = re.compile(r"(\d+)\.(\d+)\.(\d+)")
 
@@ -143,9 +194,10 @@ def read_version(run=None) -> tuple[str, str | None]:
     if run is None:
         if not shutil.which("terragrunt"):
             return "", "terragrunt is not on PATH"
-        run = lambda: subprocess.run(  # noqa: E731
-            ["terragrunt", "--version"], capture_output=True, text=True, timeout=20, check=False
-        )
+        def run():
+            return subprocess.run(
+                ["terragrunt", "--version"], capture_output=True, text=True, timeout=20, check=False
+            )
     try:
         proc = run()
     except (OSError, subprocess.SubprocessError) as e:
@@ -172,12 +224,12 @@ def hazards_for(installed: tuple[int, int, int]) -> list[str]:
     """
     out = []
     for ver in sorted(HAZARDS, key=parse, reverse=True):
-        fixed_in, texts = HAZARDS[ver]
         if installed < parse(ver):
             continue
-        if fixed_in and installed >= parse(fixed_in):
-            continue
-        out += [f"{ver}: {h}" for h in texts]
+        for fixed_in, texts in HAZARDS[ver]:
+            if fixed_in and installed >= parse(fixed_in):
+                continue
+            out += [f"{ver}: {h}" for h in texts]
     return out
 
 
@@ -212,6 +264,12 @@ def report(raw: str, err: str | None) -> tuple[int, list[str]]:
         lines.append("")
         lines.append("UPGRADE HAZARDS already in effect on this build:")
         lines += [f"  ! {h}" for h in haz]
+
+    if got < parse(UPCOMING[0]):
+        ver, kind, items = UPCOMING
+        lines.append("")
+        lines.append(f"COMING IN {ver} ({kind}) -- NOT A GATE, do not emit any of it yet:")
+        lines += [f"  > {i}" for i in items]
 
     if got > newest:
         lines.append("")

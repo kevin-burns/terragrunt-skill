@@ -165,6 +165,27 @@ the last block should keep only that block** — renaming both labels changes wh
 the inputs read. On ≤1.1.3 this is silent, so check by eye when reviewing a config that
 declares many dependencies.
 
+**v1.1.5 widened the same control to a second shape: two labels, one `config_path`.**
+
+```hcl
+dependency "vpc" {
+  config_path = "../vpc"
+}
+dependency "network" {
+  config_path = "../vpc"
+}
+```
+
+Both parse, so one unit is declared twice, and the two drift apart as soon as one gains
+`mock_outputs` or `skip_outputs` that the other lacks. v1.1.5 warns; under the strict control:
+
+```text
+/path/to/terragrunt.hcl: dependencies vpc and network both point at ../vpc; declare that dependency once and reference it under one name
+```
+
+Keep one block and point every reference at its label. On ≤1.1.4 this is silent too, so when
+reviewing, compare `config_path` values as well as labels.
+
 *Simple dependency on VPC module*
 ```hcl
 dependency "vpc" {
