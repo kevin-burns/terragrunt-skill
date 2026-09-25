@@ -210,8 +210,13 @@ read ONLY the listed reference(s), then act. References are grep-friendly — pr
 
    These references cover only some of the active experiments, so an unfamiliar `--experiment` value
    is not evidence that it is wrong — look it up rather than flagging it. For anything newer,
-   niche, or not found in the references, use the C7 search skill (Context7) or fetch
-   docs.terragrunt.com directly — do not guess.
+   niche, or not found in the references, look it up — do not guess. In order:
+   (1) the **Terragrunt docs MCP server** if it is connected (`terragrunt-docs`; add it with
+   `claude mcp add -s user --transport http terragrunt-docs https://mcp.docs.terragrunt.com/mcp`).
+   It is first-party and answers **pinned to a Terragrunt version**, so ask for the version
+   `scripts/preflight.py` reports rather than the latest. It is in public beta with no
+   availability guarantee, so if it is absent or failing, move on. (2) The C7 search skill
+   (Context7). (3) Fetch docs.terragrunt.com directly. Say which one the answer came from.
 4. Terragrunt orchestrates **OpenTofu or Terraform**; don't assume one unless the user's
    repo indicates it (`.terraform-version`, `terraform_binary`, provider constraints, or an
    `engine` block — the latter is gated behind the `iac-engine` experiment and is not covered
@@ -351,7 +356,8 @@ finds non-registry providers/modules needing research.
 
 1. Extract distinctive tokens from the error (e.g. "state lock", "Could not find").
 2. `grep -in '<token>' references/error-patterns.md`; read matched `## ERROR:` sections.
-3. No match → C7 search / docs.terragrunt.com troubleshooting; say the pattern wasn't in the
+3. No match → the docs MCP server (version-pinned), then C7 search, then docs.terragrunt.com
+   troubleshooting; say the pattern wasn't in the
    embedded set.
 
 ## REVIEW workflow

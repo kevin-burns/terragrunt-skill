@@ -78,8 +78,10 @@ skimming it is exactly how the above was nearly missed.
 - **It does not assume OpenTofu or Terraform.** Terragrunt orchestrates either; the skill
   reads your repo for the signal (`.terraform-version`, `terraform_binary`, provider
   constraints, an `engine` block) rather than guessing.
-- **It does not guess when the references fall short.** For anything newer or niche, it
-  fetches [docs.terragrunt.com](https://docs.terragrunt.com), or queries
+- **It does not guess when the references fall short.** For anything newer or niche, it asks
+  Gruntwork's [Terragrunt docs MCP server](https://docs.terragrunt.com/getting-started/install#terragrunt-docs-mcp-server)
+  first when you have it connected (version-pinned, public beta), then fetches
+  [docs.terragrunt.com](https://docs.terragrunt.com), or queries
   [Context7](https://context7.com) through [`c7search`](https://github.com/kevin-burns/c7search)
   — a separate MIT CLI of mine, installable on its own.
 - **It does not look up modules, resource types, or their inputs and outputs.** Terragrunt
