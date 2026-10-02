@@ -1,7 +1,8 @@
 ---
 name: terragrunt-skill
 license: MIT
-description: Comprehensive Terragrunt 1.x skill for generating, validating, reviewing, and debugging Terragrunt configurations (root.hcl, terragrunt.hcl, terragrunt.stack.hcl, units, stacks, catalogs) across AWS, Azure, and GCP. Use this skill whenever the user mentions Terragrunt, terragrunt.hcl, root.hcl, stack files, units, HCL orchestration of OpenTofu/Terraform, remote state DRY configuration, run --all, dependency blocks between modules, or asks to scaffold/lint/diagnose multi-environment IaC layouts — even if they don't say "Terragrunt" explicitly but show Terragrunt HCL.
+description: >-
+  Generate, validate, review and debug Terragrunt 1.x configurations (root.hcl, terragrunt.hcl, terragrunt.stack.hcl, units, stacks, catalogs) on AWS, Azure and GCP. Use whenever the user mentions Terragrunt, root.hcl, stack files, run --all, dependency blocks, DRY remote state or HCL orchestration of OpenTofu/Terraform, shows Terragrunt HCL, or asks to scaffold, lint or diagnose a multi-environment IaC layout.
 ---
 
 # Terragrunt (1.x)
