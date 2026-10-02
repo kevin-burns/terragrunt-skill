@@ -186,7 +186,7 @@ read ONLY the listed reference(s), then act. References are grep-friendly — pr
    **v1.1.6 is one Windows fix**: `find`, `list` and `browse` with a Git filter found nested units
    again. No new surface.
 
-   **v1.2.0 is a release candidate (rc1, 2026-09-24), not a release.** Keep generating for the
+   **v1.2.0 was still a release candidate on 2026-10-02 (rc1, published 2026-09-24), not a release.** Keep generating for the
    v1.1.x gates above until the preflight says 1.2.0 is installed and stable. But warn about what
    the upgrade changes, because two of the changes show up in a plan:
    - **Eleven experiments graduate to on-by-default:** `azure-backend`, `block-iteration`,
