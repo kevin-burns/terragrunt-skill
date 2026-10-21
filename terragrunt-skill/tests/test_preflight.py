@@ -136,22 +136,38 @@ def test_offline_cas_is_withheld_below_1_1_5():
     assert "offline-cas" in withheld
 
 
-def test_a_1_1_x_build_is_warned_about_1_2_without_being_told_to_emit_it():
-    """1.2.0 is a release candidate: the plan-visible changes are worth knowing before the
-    upgrade, and none of it is a gate."""
+def test_the_eleven_graduations_are_withheld_from_a_1_1_x_build():
     out = lines_for("1.1.6")
-    assert "COMING IN 1.2.0" in out and "NOT A GATE" in out
-    assert "RootAccess" in out and "base64gzip_compat" in out
-    assert "SAFE TO EMIT" in out.split("COMING IN", 1)[0]
-    assert "RootAccess" not in out.split("COMING IN", 1)[0]
+    withheld = out.split("DO NOT EMIT", 1)[1]
+    assert "v1.2.0+" in withheld and "expansion block" in withheld and "oci://" in withheld
 
 
-def test_a_1_2_release_candidate_is_treated_as_unrecorded_not_as_covered():
-    """rc1 parses as 1.2.0. It must get the ahead-of-every-gate warning, and the 'coming'
-    block must not repeat as if it were still in the future."""
+def test_1_2_0_emits_the_graduations_and_reports_its_hazards():
+    out = lines_for("1.2.0")
+    assert "DO NOT EMIT" not in out
+    assert "expansion block" in out.split("UPGRADE HAZARDS", 1)[0]
+    hazards = out.split("UPGRADE HAZARDS", 1)[1]
+    for needle in ("RootAccess", "base64gzip_compat", "READ-ONLY", "--backend-bootstrap",
+                   "JSON Lines", "hcl validate"):
+        assert needle in hazards, needle
+    assert "ahead of every gate" not in out
+
+
+def test_the_1_2_hazards_are_not_reported_below_1_2():
+    assert "RootAccess" not in lines_for("1.1.6")
+
+
+def test_a_1_2_release_candidate_does_not_reach_the_1_2_gate():
+    """rc1 parses as 1.2.0 but lacks the fixes made before release. It must be told so, and
+    the graduations must stay withheld."""
     out = lines_for("terragrunt version v1.2.0-rc1")
-    assert "ahead of every gate" in out
-    assert "COMING IN" not in out
+    assert "PRE-RELEASE" in out
+    assert "v1.2.0+" in out.split("DO NOT EMIT", 1)[1]
+
+
+def test_a_release_is_not_mistaken_for_a_pre_release():
+    out = lines_for("terragrunt version v1.2.0\nbuilt with go1.27.1")
+    assert "PRE-RELEASE" not in out and "DO NOT EMIT" not in out
 
 
 # ---------------------------------------------------------------------------

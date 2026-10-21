@@ -187,9 +187,10 @@ The Azure storage account for remote state does not exist
 - Storage account name is incorrect
 - Storage account does not exist
 - Wrong Azure subscription
-- **Expecting Terragrunt to create it** — it won't. Unlike S3/GCS, Terragrunt does NOT
-  bootstrap Azure storage (the `azure-backend` experiment is a no-op); the account and
-  container must be created out-of-band.
+- **Expecting Terragrunt to create it** — below v1.2.0 it won't unless the
+  `azure-backend` experiment is on (v1.1.2+). On v1.2.0+ it does, but only with
+  `--backend-bootstrap` (or `terragrunt backend bootstrap`). Otherwise the account and
+  container must be created out-of-band. See references/azure-backend.md.
 
 **Solutions:**
 
@@ -586,8 +587,9 @@ Terragrunt could not write the generated file.
   sometimes mounted read-only, and `generate` is the first thing that needs to write.
 - `.terragrunt-cache` owned by another user — the classic case is a run under `sudo` leaving
   root-owned files behind for the next non-root run.
-- With the **`mutable-generate` experiment** (v1.1.3+) the generated file is a **read-only link
-  into the CAS** rather than an ordinary file. Anything expecting to edit it in place fails
+- On **v1.2.0+ by default** (and on v1.1.3–v1.1.6 with the `mutable-generate` experiment)
+  the generated file is a **read-only link into the CAS** rather than an ordinary file. This
+  is the usual cause right after an upgrade to v1.2.0. Anything expecting to edit it in place fails
   here. `mutable = true` on that block gives it a writable file of its own.
 
 **Solutions:**
@@ -1604,9 +1606,9 @@ No published version of a registry module satisfies the constraint.
 - The constraint is tighter than anything published, or names a version that was yanked.
 - The module has no published versions at all — usually a namespace or provider typo in the
   `tfr://` address.
-- **You used a `version` attribute without the experiment.** Resolving a `tfr://` module by
-  constraint rather than by an exact version in the URL is the `version-attribute` experiment
-  and needs **v1.1.1+** plus the flag. Without it the attribute is not available, and the
+- **You used a `version` attribute on a build below v1.2.0 without the experiment.**
+  Resolving a `tfr://` module by constraint rather than by an exact version in the URL is
+  the `version-attribute` experiment on v1.1.1–v1.1.6, and GA (no flag) on v1.2.0+. Below v1.2.0 without the flag the attribute is not available, and the
   version has to be pinned in the source URL itself.
 - A bare `tfr:///` (three slashes) does not resolve to a fixed registry — see
   `references/hcl-blocks.md` under `## BLOCK: terraform`.

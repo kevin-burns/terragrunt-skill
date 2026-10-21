@@ -48,8 +48,8 @@ read ONLY the listed reference(s), then act. References are grep-friendly — pr
 
    **v1.1.1 added two experiments** (opt-in, not GA), both on the `terraform` block and both
    requiring **v1.1.1+**: `oci` (module sources from OCI registries via `oci://`) and
-   `version-attribute` (a `version` constraint for `tfr://` registry modules). Syntax and the
-   gating rules are in `references/hcl-blocks.md` under `## BLOCK: terraform`. v1.1.1 was
+   `version-attribute` (a `version` constraint for `tfr://` registry modules); **both GA in
+   v1.2.0**. Syntax and the gating rules are in `references/hcl-blocks.md` under `## BLOCK: terraform`. v1.1.1 was
    otherwise a bug-fix release — it introduced no new GA surface.
 
    **v1.1.2 added no new GA surface either, but two of its fixes change what to advise.**
@@ -95,12 +95,15 @@ read ONLY the listed reference(s), then act. References are grep-friendly — pr
    silent discard), `bounded-discovery` (above), `browse-tui` (`terragrunt browse`, a
    three-column TUI estate browser), `mutable-generate` (see the collision warning below) and
    `optional-dependency-outputs` (`--no-dependency-outputs`, the global form of
-   `skip_outputs`). Syntax and gating in `references/hcl-blocks.md`.
+   `skip_outputs`). Syntax and gating in `references/hcl-blocks.md`. **All but `browse-tui`
+   are GA in v1.2.0**, and `block-iteration` stopped being reserved-only there: `expansion`
+   really iterates.
 
    **NAME COLLISION — `mutable` now means two different things.** On the **`unit`** block it is
    GA since v1.1.0 and needs no experiment. On the **`generate`** block it is new in v1.1.3 and
-   requires `--experiment mutable-generate`; setting it without the experiment is an error, and
-   earlier versions reject the attribute outright. Do not carry the v1.1.0 gate across to
+   requires `--experiment mutable-generate` on v1.1.3–v1.1.6; setting it without the experiment
+   is an error there, and earlier versions reject the attribute outright. **From v1.2.0 it is
+   GA, and generated files are read-only CAS links unless `mutable = true`.** Do not carry the v1.1.0 gate across to
    `generate`. Both are in `references/hcl-blocks.md`.
 
    **Experiments are not a short list, and they move in patch releases.** Alongside the two
@@ -187,27 +190,42 @@ read ONLY the listed reference(s), then act. References are grep-friendly — pr
    **v1.1.6 is one Windows fix**: `find`, `list` and `browse` with a Git filter found nested units
    again. No new surface.
 
-   **v1.2.0 was still a release candidate on 2026-10-18 (rc3, published 2026-10-15; rc1 was 2026-09-24), not a release.** rc2 and rc3 kept the same two breaking changes and added only fixes. Keep generating for the
-   v1.1.x gates above until the preflight says 1.2.0 is installed and stable. But warn about what
-   the upgrade changes, because two of the changes show up in a plan:
-   - **Eleven experiments graduate to on-by-default:** `azure-backend`, `block-iteration`,
-     `bounded-discovery`, `catalog-format`, `dependency-fetch-output-from-state`,
-     `mutable-generate`, `oci`, `optional-dependency-outputs`, `optional-hooks`, `profiling`,
-     `version-attribute`. Their `--experiment` flags then only warn. Once 1.2.0 is stable,
-     advice above that says "opt-in, gate at v1.1.x" becomes wrong for these eleven.
-   - **Dependency outputs are read straight from S3, GCS or azurerm state by default**, falling
-     back to `output -json`. `--no-dependency-fetch-output-from-state` forces the old path.
-   - **`base64gzip()` switches to the Go 1.27 bytes**, so the replacement described under v1.1.5
-     comes back on purpose. Where the encoded value must stay stable, use `base64gzip_compat()`.
-   - **S3 state bucket bootstrap no longer adds the `RootAccess` policy statement**, which
-     granted `s3:*` to the whole account. `skip_bucket_root_access` is deprecated; the opt-in is
+   **v1.2.0 (released 2026-10-21) completed eleven experiments.** `azure-backend`,
+   `block-iteration`, `bounded-discovery`, `catalog-format`,
+   `dependency-fetch-output-from-state`, `mutable-generate`, `oci`,
+   `optional-dependency-outputs`, `optional-hooks`, `profiling` and `version-attribute` are on
+   by default, and their `--experiment` flags only warn. On v1.2.0+ emit them without a flag;
+   **below v1.2.0 every gate above still applies.** The release candidates (rc1 2026-09-24 to
+   rc3 2026-10-15) do not count: the preflight reports an rc as below the v1.2.0 gate.
+   What changes on upgrade without opting in (the preflight lists all of these as hazards):
+   - **`base64gzip()` returns the Go 1.27 bytes**, so the replacement described under v1.1.5
+     comes back on purpose. Where the encoded value must stay stable, use `base64gzip_compat()`
+     — still behind `--experiment base64gzip-compat`.
+   - **S3 state bucket bootstrap no longer adds the `RootAccess` policy statement** (`s3:*`
+     for the whole account). `skip_bucket_root_access` is deprecated; the opt-in is
      `enable_bucket_root_access = true`. Buckets that already have the statement keep it.
-   - **For agents:** an `mcp-command` experiment serves Terragrunt (units, dependency graph,
-     validation, run order, outputs) over MCP and refuses to start subprocesses unless you pass
-     `--allow=exec`. There is also a public, version-pinned **Terragrunt docs MCP server** at
-     `https://mcp.docs.terragrunt.com/mcp` (public beta), a first-party source for the "look it
-     up" rule below.
-   `scripts/preflight.py` prints all of this under COMING IN 1.2.0 on any v1.1.x build.
+   - **Generated files are read-only CAS links by default.** A hook or script that edits a
+     generated file in place fails with a permission error; set `mutable = true` on that
+     `generate` block, or run with `--no-cas`.
+   - **`--backend-bootstrap` now creates Azure state resources** (resource group, storage
+     account, container) it used to skip, and converges versioning and soft delete on
+     existing accounts. New accounts get minimum TLS 1.2 (`minimum_tls_version` raises it).
+   - **Dependency outputs are read straight from S3, GCS or azurerm state**, falling back to
+     `output -json` on an unsupported backend or a permission error.
+     `--no-dependency-fetch-output-from-state` forces the old path.
+   - **Output and validation that scripts and CI see:** `info print --all` writes JSON Lines;
+     `catalog` writes `jsonl` instead of opening the TUI off a terminal; `hcl validate` fails on
+     a `dependency` whose unit is gone; a malformed `exclude` block is an error rather than
+     silently dropped; and `-destroy=true` now counts as a destroy for `prevent_destroy`.
+   - **New, no gate to check beyond v1.2.0:** OpenTofu 1.13 functions in Terragrunt HCL
+     (`assume*`, `templatestring`, `urldecode`, `cidrcontains`, …); an expanded unit is
+     referenced as `unit.<name>[key].path`; S3 bucket names ending `-<account>-<region>-an`
+     are created in the account regional namespace.
+   - **For agents:** the `mcp-command` experiment (`terragrunt mcp`) is still an experiment and
+     will not stabilise before v1.3; it starts no subprocesses without `--allow=exec`. The public
+     **Terragrunt docs MCP server** at `https://mcp.docs.terragrunt.com/mcp` (public beta) is a
+     first-party source for the "look it up" rule below.
+
 
    These references cover only some of the active experiments, so an unfamiliar `--experiment` value
    is not evidence that it is wrong — look it up rather than flagging it. For anything newer,
@@ -283,8 +301,8 @@ Counts are verified against the files, not asserted: regenerate with
   `## COMPARISON:` (e.g. dependency vs dependencies) and `## DECISION:` guides
 - `references/advanced-examples.md` — 28 worked examples. `grep '^## EXAMPLE:'`
 - `references/azure-backend.md` — Azure (`azurerm`) remote state + provider setup and
-  gotchas: whether Terragrunt bootstraps Azure depends on version + experiment
-  (no by default, yes on v1.1.2+ with `--experiment azure-backend`), backend key list, auth methods,
+  gotchas: whether Terragrunt bootstraps Azure depends on version (no below v1.1.2; yes on
+  v1.1.2–v1.1.6 with `--experiment azure-backend`; yes by default on v1.2.0+), backend key list, auth methods,
   `use_azuread_auth`/Entra ID, provider v4 `subscription_id`, RBAC + shared-key gotchas,
   OIDC for CI. Read this for ANY Azure backend/provider task.
 - `references/cicd.md` — CI/CD: OIDC to AWS (incl. the immutable `sub` claim that breaks
@@ -305,9 +323,10 @@ Counts are verified against the files, not asserted: regenerate with
 - `templates/module/terragrunt.hcl` — standalone unit
 - `templates/backends/` — remote_state for S3/GCS/Azure, essential + advanced tiers.
   **Azure caveat:** by default `azurerm` passes through to the native backend and
-  Terragrunt does NOT bootstrap/migrate/delete Azure storage, so the account/container
-  must pre-exist — which is what these templates assume. On **v1.1.2+ with
-  `--experiment azure-backend`** that reverses and Terragrunt does manage them. Establish
+  Terragrunt does NOT bootstrap/migrate/delete Azure storage below v1.2.0, so the
+  account/container must pre-exist — which is what these templates assume. On **v1.1.2–v1.1.6
+  with `--experiment azure-backend`**, and **by default on v1.2.0+**, that reverses and
+  Terragrunt does manage them (`--backend-bootstrap` creates them). Establish
   the version before advising; full detail in `references/azure-backend.md`.
 - `templates/providers/` — provider `generate` blocks for all three clouds
   (`aws-generate-provider.hcl`, `azure-generate-provider.hcl`, `gcp-generate-provider.hcl`).

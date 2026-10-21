@@ -25,16 +25,25 @@
 > changed the headline answer: the `azure-backend` experiment is still an experiment and has
 > not graduated, but it is no longer inert — with it enabled on v1.1.2+ Terragrunt *does*
 > bootstrap, converge, delete and migrate Azure state resources. On the default path, and on
-> anything below v1.1.2, it still creates nothing. Grep-friendly: `grep -n '^## ' azure-backend.md`.
+> anything below v1.1.2, it still creates nothing. **Updated 2026-10-21 for v1.2.0**, which
+> completed the experiment: bootstrap, delete and migrate are on by default.
+> Grep-friendly: `grep -n '^## ' azure-backend.md`.
 
 ## THE ONE THING TO GET RIGHT: ask which version, then which flags
 
 For S3 and GCS, Terragrunt natively **auto-provisions** the backend (bucket, lock table)
 and supports `backend bootstrap` / `backend migrate` / `backend delete`. **Azure is
-different**, and the answer changed in **v1.1.2** (2026-07-29). Establish the user's version
-before advising, because the two answers are opposites.
+different**, and the answer changed twice: in **v1.1.2** (2026-07-29, behind an experiment)
+and in **v1.2.0** (2026-10-21, by default). Establish the user's version before advising,
+because the answers are opposites.
 
-**Default on every version, and on anything below v1.1.2 — Terragrunt creates nothing.**
+| Version | Does Terragrunt bootstrap / delete / migrate Azure state? |
+|---|---|
+| below v1.1.2 | **No.** Never. |
+| v1.1.2 – v1.1.6 | **Only with `--experiment azure-backend`.** No by default. |
+| v1.2.0+ | **Yes, by default.** No experiment flag (passing it only warns). |
+
+**Below v1.2.0 without the experiment — Terragrunt creates nothing.**
 
 - `terragrunt backend bootstrap` does **NOT** create the storage account or container.
 - `terragrunt backend migrate` / `delete` do **NOT** act on Azure resources (migrate falls
@@ -42,13 +51,14 @@ before advising, because the two answers are opposites.
 - `remote_state { backend = "azurerm" }` behaves like a `generate` block: it writes the
   backend config but creates nothing.
 
-So unless the user is on v1.1.2+ *and* has the experiment on, **the storage account + blob
+So below v1.2.0, unless the user has the experiment on (v1.1.2+), **the storage account + blob
 container MUST already exist** before `terragrunt … init`. Provision them out-of-band — `az`
 CLI, Bicep/ARM, or a dedicated bootstrap unit (run with local state, or a chicken-and-egg
 shared account created once by hand). The `az` recipe below stays the default path.
 
-**v1.1.2+ with `--experiment azure-backend` — Terragrunt does manage it.** Still opt-in, and
-still an experiment, so it may change again. With the experiment enabled Terragrunt can
+**v1.2.0+, or v1.1.2–v1.1.6 with `--experiment azure-backend` — Terragrunt does manage it.**
+On v1.2.0 this is the default: **a run that already passes `--backend-bootstrap` now creates
+the Azure resources it used to skip**, so check that before an upgrade lands in CI. Terragrunt can
 bootstrap the resource group, storage account and blob container behind
 `remote_state { backend = "azurerm" }`, detect whether the backend needs bootstrapping,
 converge blob versioning and soft-delete settings, delete state blobs or containers, and
@@ -61,17 +71,30 @@ underlying `azurerm` backend only receives keys it understands. Note `msi_resour
 bootstrap-only: it also selects the managed identity used for delete and migrate.
 
 ```bash
-terragrunt --experiment azure-backend run -- plan
+terragrunt --backend-bootstrap run -- plan                          # v1.2.0+
+terragrunt --experiment azure-backend --backend-bootstrap run -- plan   # v1.1.2 – v1.1.6
 ```
+
+**v1.2.0+ sets a minimum TLS version on accounts it creates.** The ARM API treats an unset
+value as `TLS1_0`, which Azure deprecated in August 2025, so Terragrunt creates new accounts at
+`TLS1_2`. `minimum_tls_version = "TLS1_3"` in the `remote_state` config raises it; `TLS1_2`
+and `TLS1_3` are the only accepted values. An existing account's setting is left alone.
+
+**v1.2.0 fix for delegated role assignment:** with `assign_blob_data_role` and no
+`principal_id`, Terragrunt now sends the principal type read from the token, so an identity
+whose `roleAssignments/write` is constrained by a principal-type condition (a delegated RBAC
+Administrator) can make the assignment.
 
 Before v1.1.2 this file said flatly "never tell a user Terragrunt will bootstrap Azure
 state". That was correct for two years and is now correct only for the default path, which is
 why the version question comes first. Do not carry the old blanket claim forward, and do not
-assume the new behaviour either — it is gated twice, on version and on the experiment flag.
+assume the new behaviour either — below v1.2.0 it is gated twice, on version and on the
+experiment flag.
 
 Docs: https://docs.terragrunt.com/features/units/state-backend/ ·
-https://docs.terragrunt.com/reference/experiments/active#azure-backend ·
-v1.1.2 release notes: https://github.com/gruntwork-io/terragrunt/releases/tag/v1.1.2
+https://docs.terragrunt.com/reference/experiments/completed/#azure-backend ·
+v1.1.2 release notes: https://github.com/gruntwork-io/terragrunt/releases/tag/v1.1.2 ·
+v1.2.0 release notes: https://github.com/gruntwork-io/terragrunt/releases/tag/v1.2.0
 
 ### Minimal bootstrap of the state storage with `az` (run once, out-of-band)
 ```bash
@@ -261,7 +284,7 @@ the backend and resource operations federate.
 
 ## Quick checklist for an Azure Terragrunt setup
 ```
-[ ] Storage account + container created out-of-band — unless on v1.1.2+ with `--experiment azure-backend`, which does bootstrap them
+[ ] Storage account + container created out-of-band — unless on v1.2.0+ (or v1.1.2–v1.1.6 with `--experiment azure-backend`) with --backend-bootstrap, which creates them
 [ ] allow_shared_key_access=false  →  use_azuread_auth = true in remote_state config
 [ ] Deploying identity has "Storage Blob Data Contributor" on the account/container
 [ ] remote_state in root.hcl, key = "${path_relative_to_include()}/terraform.tfstate"
@@ -272,7 +295,7 @@ the backend and resource operations federate.
 
 ## Sources
 - Terragrunt state backend: https://docs.terragrunt.com/features/units/state-backend/
-- Terragrunt experiments (`azure-backend`): https://docs.terragrunt.com/reference/experiments/active
+- Terragrunt experiments (`azure-backend`, completed in v1.2.0): https://docs.terragrunt.com/reference/experiments/completed/#azure-backend
 - azurerm backend keys/auth: https://developer.hashicorp.com/terraform/language/backend/azurerm
 - azurerm provider v4 (subscription_id): https://learn.microsoft.com/azure/developer/terraform/provider-history/provider-version-history-azurerm-4-0-0-to-current
 - State in Azure Storage (locking, pre-existing): https://learn.microsoft.com/azure/developer/terraform/store-state-in-azure-storage

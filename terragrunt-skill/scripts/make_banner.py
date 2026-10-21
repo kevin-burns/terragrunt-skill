@@ -13,10 +13,12 @@ So the banner is a build artifact too. The volatile parts are placeholders fille
 banner is regenerated rather than edited.
 
 WHAT IS AND IS NOT A PLACEHOLDER, because the distinction is the skill's own hard policy 3.
-`v1.1.0+ autoinclude ...` and `v1.1.1+ oci:// sources` are facts about WHEN A FEATURE LANDED.
-Those do not rot, so they stay in the template as literal text. What rots is the transcript
-line -- which binary this was run against -- and which upgrade hazard is newest. Those two are
-filled here.
+`v1.1.0+ autoinclude ...` and `v1.2.0+ expansion · oci://` are facts about WHEN A FEATURE
+LANDED. Those do not rot, so they stay in the template as literal text. A FLAG beside one does
+rot: the row used to read `v1.1.1+ oci:// sources --experiment oci`, true until v1.2.0
+completed the experiment and the flag began to warn. Keep experiment flags out of literal rows.
+What rots is the transcript line -- which binary this was run against -- and which upgrade
+hazard is newest. Those two are filled here.
 
 DRIFT WARNS, IT DOES NOT BLOCK. `--check` reports that the committed banner no longer matches
 the installed binary and exits 0 anyway. A check that fails the build the day Terragrunt ships

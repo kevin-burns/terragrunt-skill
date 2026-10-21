@@ -82,6 +82,30 @@ GATES = (
     ("1.1.6", "advice, not syntax", (
         "Windows: find / list / browse with a Git filter find nested units again",
     )),
+    ("1.2.0", "GA, eleven experiments completed -- their --experiment flags only warn", (
+        "terraform.source / unit / stack source oci://  (was --experiment oci)",
+        "terraform.version constraint for tfr://   (was --experiment version-attribute)",
+        "expansion block (count / for_each) on unit, stack and dependency; unit.<name>[key].path; "
+        "enabled on unit and stack  (was --experiment block-iteration, reserved-only before)",
+        "--discovery-boundary and the (dir) filter operand  (was --experiment bounded-discovery)",
+        "generate.mutable; generated files live in the CAS, read-only by default "
+        "(was --experiment mutable-generate)",
+        "--no-dependency-outputs  (was --experiment optional-dependency-outputs)",
+        "--no-hooks  (was --experiment optional-hooks)",
+        "--profile-cpu / --profile-mem / --profile-goroutine / --profile-dir  "
+        "(was --experiment profiling)",
+        "catalog --format=jsonl|md, and jsonl by default off a terminal  "
+        "(was --experiment catalog-format)",
+        "azurerm state bootstrap, delete and migrate; minimum_tls_version  "
+        "(was --experiment azure-backend)",
+        "dependency outputs read from S3 / GCS / azurerm state by default; "
+        "--no-dependency-fetch-output-from-state forces output -json  "
+        "(was --experiment dependency-fetch-output-from-state)",
+        "OpenTofu 1.13 functions in Terragrunt HCL (assume*, templatestring, urldecode, ...)",
+        "S3 enable_bucket_root_access = true; '-an' bucket names use the account regional namespace",
+        "still EXPERIMENTAL: base64gzip_compat() (--experiment base64gzip-compat), "
+        "terragrunt mcp (--experiment mcp-command, not stable before v1.3)",
+    )),
 )
 
 # Changes that break a working configuration on upgrade WITHOUT anyone enabling anything.
@@ -158,27 +182,39 @@ HAZARDS = {
         "TG_LOG_LEVEL=info is no longer overridden by TERRAGRUNT_LOG_LEVEL=debug beside it. "
         "A CLI argument still beats an environment variable under either name.",
     )),),
+    # Listed by Gruntwork as within the 1.0 guarantees, which is about the CLI and HCL
+    # schemas. Each of these still changes a plan, a permission or a script's input.
+    "1.2.0": ((None, (
+        "PLAN-VISIBLE: base64gzip() returns the Go 1.27 bytes. A resource comparing the "
+        "encoded value (aws_instance user_data_base64 with user_data_replace_on_change = true) "
+        "plans a REPLACEMENT on the first run. base64gzip_compat() under "
+        "--experiment base64gzip-compat keeps the v1.1.3 bytes.",
+        "PLAN-VISIBLE: S3 state bucket bootstrap no longer adds the RootAccess statement "
+        "(s3:* for the whole account). skip_bucket_root_access is deprecated; "
+        "enable_bucket_root_access = true restores it. Existing buckets keep the statement.",
+        "Generated files now live in the CAS and are READ-ONLY by default. A hook or script "
+        "that edits provider.tf (or any generated file) in place fails with a permission "
+        "error. Set mutable = true on that generate block, or run with --no-cas.",
+        "--backend-bootstrap now CREATES the azurerm resource group, storage account and "
+        "container it used to skip, and converges versioning and soft delete on existing "
+        "accounts. New accounts get minimum TLS 1.2.",
+        "terragrunt catalog writes jsonl instead of opening the TUI when stdin or stdout is "
+        "not a terminal.",
+        "terragrunt info print --all writes JSON Lines, and each unit's own download_dir. "
+        "Anything parsing the old indented output breaks.",
+        "hcl validate FAILS on a dependency whose config_path has no unit; a malformed "
+        "exclude block (e.g. actions = \"plan\") is now an error instead of being dropped; "
+        "a stack declaring one unit/stack label both with and without expansion fails to parse.",
+        "plan/apply -destroy=true now counts as destroy: prevent_destroy stops it, and "
+        "exclude, hook and extra_arguments rules for destroy apply.",
+        "S3 access-log buckets Terragrunt creates get a bucket policy, not an ACL; "
+        "skip_accesslogging_bucket_acl is deprecated and does nothing.",
+    )),),
 }
 
-# A RELEASE CANDIDATE, not a release. Kept apart from GATES on purpose: a gate says "safe to
-# emit", and nothing in an RC is. Printed as a warning on every build below it, so an upgrade
-# is planned rather than discovered. When 1.2.0 ships stable, move the graduations into a GATES
-# row, the plan-visible changes into HAZARDS, and delete this block.
-UPCOMING = ("1.2.0", "release candidate rc1, 2026-09-24", (
-    "Eleven experiments graduate to on-by-default: azure-backend, block-iteration, "
-    "bounded-discovery, catalog-format, dependency-fetch-output-from-state, mutable-generate, "
-    "oci, optional-dependency-outputs, optional-hooks, profiling, version-attribute. Their "
-    "--experiment flags then only warn.",
-    "Dependency outputs are read straight from S3 / GCS / azurerm state by default "
-    "(--no-dependency-fetch-output-from-state forces tofu output -json).",
-    "PLAN-VISIBLE: base64gzip() switches to the Go 1.27 bytes, so resources comparing the "
-    "encoded value plan a replacement. base64gzip_compat() keeps the old bytes.",
-    "PLAN-VISIBLE: S3 state bucket bootstrap no longer adds the RootAccess policy statement "
-    "(s3:* for the whole account). skip_bucket_root_access is deprecated; opt in with "
-    "enable_bucket_root_access = true. Existing buckets keep the statement.",
-    "For agents: mcp-command experiment (terragrunt mcp; no subprocesses without --allow=exec), "
-    "and the public docs MCP server at https://mcp.docs.terragrunt.com/mcp (beta).",
-))
+# A pre-release of a recorded version (v1.2.0-rc1) parses as that version but is not it: an
+# rc lacks the fixes made before release. It must not satisfy its own version's gate.
+PRERELEASE_RE = re.compile(r"\d+\.\d+\.\d+-[0-9A-Za-z]")
 
 VERSION_RE = re.compile(r"(\d+)\.(\d+)\.(\d+)")
 
@@ -207,11 +243,14 @@ def read_version(run=None) -> tuple[str, str | None]:
     return (proc.stdout or "").strip(), None
 
 
-def gates_for(installed: tuple[int, int, int]) -> tuple[list, list]:
-    """(satisfied, unmet) gate rows for an installed version."""
+def gates_for(installed: tuple[int, int, int], pre: bool = False) -> tuple[list, list]:
+    """(satisfied, unmet) gate rows for an installed version. A pre-release of a version
+    does not satisfy that version's own gate."""
     satisfied, unmet = [], []
     for ver, kind, items in GATES:
-        (satisfied if installed >= parse(ver) else unmet).append((ver, kind, items))
+        g = parse(ver)
+        ok = installed > g or (installed == g and not pre)
+        (satisfied if ok else unmet).append((ver, kind, items))
     return satisfied, unmet
 
 
@@ -241,11 +280,15 @@ def report(raw: str, err: str | None) -> tuple[int, list[str]]:
     if not got:
         return 1, [f"FAIL could not parse a version out of {raw!r}"]
 
+    pre = bool(PRERELEASE_RE.search(raw))
     shown = ".".join(str(n) for n in got)
     newest = parse(GATES[-1][0])
-    lines = [f"terragrunt {shown}"]
+    lines = [f"terragrunt {shown}" + (" (PRE-RELEASE)" if pre else "")]
+    if pre:
+        lines.append(f"WARN  a pre-release of v{shown} does not reach the v{shown} gate; "
+                     "upgrade to the release before emitting anything it graduates.")
 
-    satisfied, unmet = gates_for(got)
+    satisfied, unmet = gates_for(got, pre)
     if satisfied:
         lines.append("")
         lines.append("SAFE TO EMIT -- gates this build satisfies:")
@@ -264,12 +307,6 @@ def report(raw: str, err: str | None) -> tuple[int, list[str]]:
         lines.append("")
         lines.append("UPGRADE HAZARDS already in effect on this build:")
         lines += [f"  ! {h}" for h in haz]
-
-    if got < parse(UPCOMING[0]):
-        ver, kind, items = UPCOMING
-        lines.append("")
-        lines.append(f"COMING IN {ver} ({kind}) -- NOT A GATE, do not emit any of it yet:")
-        lines += [f"  > {i}" for i in items]
 
     if got > newest:
         lines.append("")

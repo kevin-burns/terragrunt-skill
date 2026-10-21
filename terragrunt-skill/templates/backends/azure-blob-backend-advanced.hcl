@@ -14,11 +14,12 @@
 #   {{snapshot}} (optional, default=-): Enable snapshot support for point-in-time recovery
 #   {{use_azuread_auth}} (optional, default=-): Use Azure AD authentication instead of access keys
 
-# NOTE (Terragrunt 1.0.x): remote_state backend "azurerm" passes through to the
-# native OpenTofu/Terraform azurerm backend. Terragrunt-native bootstrap/migrate/
-# delete for Azure storage is an active experiment (azure-backend) — unlike S3/GCS,
-# do not assume `terragrunt backend bootstrap` provisions Azure storage yet.
-# Ref: https://docs.terragrunt.com/reference/experiments/active
+# NOTE: below Terragrunt v1.2.0, remote_state backend "azurerm" passes through to the
+# native OpenTofu/Terraform azurerm backend and Terragrunt creates nothing (v1.1.2-v1.1.6:
+# unless --experiment azure-backend). On v1.2.0+ `--backend-bootstrap` provisions the
+# resource group, storage account and container. Establish the version first; see
+# references/azure-backend.md.
+# Ref: https://docs.terragrunt.com/reference/experiments/completed/#azure-backend
 
 remote_state {
   backend = "azurerm"

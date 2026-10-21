@@ -94,12 +94,14 @@ def test_a_template_placeholder_with_no_value_is_refused():
 
 
 def test_the_durable_gate_facts_are_not_placeholders():
-    """v1.1.0+ and v1.1.1+ say WHEN a feature landed. Those do not rot, and turning them into
-    placeholders would make them move every release for no reason."""
+    """v1.1.0+ and v1.2.0+ say WHEN a feature landed. Those do not rot, and turning them into
+    placeholders would make them move every release for no reason. An experiment flag beside
+    one does rot -- `--experiment oci` only warns from v1.2.0 -- so none may be literal."""
     tmpl = mb.TMPL.read_text()
     assert "v1.1.0+" in tmpl
-    assert "v1.1.1+" in tmpl
+    assert "v1.2.0+" in tmpl
     assert "autoinclude" in tmpl
+    assert "--experiment" not in tmpl
 
 
 def test_the_committed_banner_carries_no_leftover_placeholder():

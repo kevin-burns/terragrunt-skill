@@ -25,6 +25,7 @@
 >
 > Content spot-checked against docs.terragrunt.com at **v1.1.0** (2026-07-01); reviewed against the **v1.1.1** release notes (2026-07-14) on 2026-07-29 with no changes required — v1.1.1 was bug-fix only, and its two new experiments touch the `terraform` block (see hcl-blocks.md). Grep-friendly:
 > `grep -n '^## ' scale-and-performance.md`.
+> **Reviewed against the v1.2.0 release notes on 2026-10-21:** the eleven completed experiments are marked GA from v1.2.0 with their v1.1.x gates kept, and the behaviour changes are noted where they apply.
 
 ## TL;DR recipes
 
@@ -182,15 +183,23 @@ Docs: https://docs.terragrunt.com/features/caching/cas/
 
 ## Speed knob 3: fetch dependency outputs from state
 
-`--dependency-fetch-output-from-state` reads a dependency's outputs straight from the remote
-state file instead of running `tofu output` (and skips initializing the dependency) — a big
-win when units have many dependencies.
+Reading a dependency's outputs straight from the remote state file instead of running
+`tofu output` (and skipping initializing the dependency) is a big win when units have many
+dependencies.
 
-- **S3 backends only**; falls back to the normal path elsewhere.
-- **Incompatible with OpenTofu state encryption.**
-- Still experimental: `--experiment=dependency-fetch-output-from-state`.
+- **v1.2.0+: on by default** for **S3, GCS and azurerm** — no flag. When a direct read is
+  unsupported or fails on a permission or network error, Terragrunt falls back to
+  `tofu/terraform output -json` with the same outputs, so only the speedup is lost.
+  `--no-dependency-fetch-output-from-state` (env `TG_NO_DEPENDENCY_FETCH_OUTPUT_FROM_STATE`)
+  forces the old path. Passing `--dependency-fetch-output-from-state` still works but warns
+  (the `dependency-fetch-output-from-state` strict control makes it an error). v1.2.0 also
+  reads GCS state directly under service-account impersonation, which it used to skip.
+- **Below v1.2.0:** opt-in with `--dependency-fetch-output-from-state` plus
+  `--experiment=dependency-fetch-output-from-state`, and **S3 backends only**.
+- **Incompatible with OpenTofu state encryption** (documented for v1.1.x; the v1.2.0 notes do
+  not say whether that changed — check before relying on it with encrypted state).
 
-Docs: https://docs.terragrunt.com/troubleshooting/performance/ · https://docs.terragrunt.com/reference/experiments/active
+Docs: https://docs.terragrunt.com/troubleshooting/performance/ · https://docs.terragrunt.com/reference/experiments/completed/#dependency-fetch-output-from-state
 
 ## Parallelism & queue control
 
@@ -263,6 +272,7 @@ performance techniques here don't require it.
 - provider cache server: https://docs.terragrunt.com/features/provider-cache-server/
 - CAS: https://docs.terragrunt.com/features/caching/cas/
 - experiments — cas / mark-many-as-read / opt-out-auth / dag-queue-display / stack-dependencies / catalog-redesign graduated to GA in v1.1.0. Twelve active as of v1.1.2: azure-backend, deep-merge, dependency-fetch-output-from-state, hook-context-env, iac-engine, oci, optional-hooks, otel-logs, profiling, slow-task-reporting, symlinks, version-attribute (oci and version-attribute new in v1.1.1; otel-logs and profiling new in v1.1.2, and v1.1.2 also made azure-backend functional — see azure-backend.md). Authoritative list: https://docs.terragrunt.com/reference/experiments/active
+- v1.2.0 completed eleven: azure-backend, block-iteration, bounded-discovery, catalog-format, dependency-fetch-output-from-state, mutable-generate, oci, optional-dependency-outputs, optional-hooks, profiling, version-attribute. Release notes: https://github.com/gruntwork-io/terragrunt/releases/tag/v1.2.0
 - v1.1.0 release notes: https://github.com/gruntwork-io/terragrunt/releases/tag/v1.1.0
 - v1.1.1 release notes: https://github.com/gruntwork-io/terragrunt/releases/tag/v1.1.1
 - v1.1.3 release notes: https://github.com/gruntwork-io/terragrunt/releases/tag/v1.1.3 — two provider-cache race conditions fixed; `providers lock` space-delimited flag values; `--filter` now reserves `(`/`)` unconditionally and applies positive expressions after a leading negation; `tflint` hook honours `--config=`; `scaffold` fixed for units and stacks; five experiments added, none graduated

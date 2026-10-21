@@ -37,6 +37,7 @@
 > **v1.1.0 note:** CAS, the redesigned `catalog`, reading-detection for local modules, the
 > discovery-auth opt-out, and the dependency-tree run-queue display all graduated to GA and are
 > **on by default** — the matching `--experiment` flags are no longer needed (passing one warns).
+> **Reviewed against the v1.2.0 release notes on 2026-10-21:** the eleven completed experiments are marked GA from v1.2.0 with their v1.1.x gates kept, and the behaviour changes are noted where they apply.
 
 Lookup: `grep -n '^## COMMAND:' cli-reference.md` | `grep -A 20 '^## COMMAND: stack run'`
 
@@ -74,7 +75,7 @@ The `--filter` flag is the single 1.0 mechanism for targeting units and stacks, 
 > returns `bar`. A query is treated as an exclusion only when **every** expression in it is
 > negated (`'!name=foo'`, `'!name=foo | !name=bar'`).
 >
-> **`bounded-discovery` (v1.1.3, opt-in)** additionally bounds graph traversal to a
+> **`bounded-discovery` (opt-in on v1.1.3–v1.1.6; GA, no flag, on v1.2.0+)** additionally bounds graph traversal to a
 > directory: `--discovery-boundary <dir>` (env `TG_DISCOVERY_BOUNDARY`) replaces the Git
 > repository root as the enclosure for a whole run, and the inline `(dir)` operand bounds a
 > single expression, overriding the flag. Anything resolving outside the boundary is not
@@ -114,17 +115,19 @@ Automatically provisions the backend resources needed for remote state storage �
 **but only for the backends Terragrunt natively manages: S3 (bucket + optional
 DynamoDB lock table + access-logging bucket) and GCS (bucket).**
 
-> **Azure (azurerm): depends on version AND experiment — ask before advising.**
-> By default, and on anything below **v1.1.2**, Terragrunt does **not** create,
+> **Azure (azurerm): depends on version — ask before advising.**
+> On **v1.2.0+** Terragrunt manages Azure state by default (no experiment). Below
+> v1.2.0, by default, and on anything below **v1.1.2**, Terragrunt does **not** create,
 > migrate or delete Azure storage accounts/containers; the `azurerm` backend is
 > passed through to OpenTofu/Terraform as-is, so the storage account and blob
 > container must already exist (create them with `az`, Bicep, or a separate
 > bootstrap unit). On **v1.1.2+ with `--experiment azure-backend`** this reverses:
 > Terragrunt bootstraps the resource group, storage account and container, detects
 > whether bootstrapping is needed, converges versioning/soft-delete, and deletes or
-> migrates state blobs within the same account. Still opt-in and still an
-> experiment. Ref: references/azure-backend.md ·
-> https://docs.terragrunt.com/reference/experiments/active
+> migrates state blobs within the same account. On v1.1.2–v1.1.6 that is opt-in;
+> v1.2.0 made it the default, so `--backend-bootstrap` now creates Azure resources
+> it used to skip. Ref: references/azure-backend.md ·
+> https://docs.terragrunt.com/reference/experiments/completed/#azure-backend
 
 **Options:**
 - `--config`: Path to the Terragrunt configuration file
@@ -147,7 +150,8 @@ Delete the backend state for a unit.
 Deletes the backend state object (e.g. the state file) for the current unit. Use with
 caution; `--force` is dangerous — deleting unversioned state is irreversible, so back up
 first. Documented for S3 (and applies to the natively-managed backends); **for `azurerm`
-Terragrunt does not delete Azure resources** (the `azure-backend` experiment is a no-op).
+Terragrunt deletes Azure state only on v1.2.0+, or on v1.1.2–v1.1.6 with `--experiment
+azure-backend`**; below that it does not act on Azure resources.
 
 **Options:**
 - `--all`: Delete state for all units in the stack
@@ -213,6 +217,15 @@ directory — components can live anywhere; add a `.terragrunt-catalog-ignore` f
 globs) to filter paths out. Each component shows a **kind** label (`template`, `stack`, `unit`,
 `module`) plus optional tags from its `README.md` front-matter; press `s` on a component to
 open the interactive scaffold screen.
+
+**v1.2.0: non-interactive output (was the `catalog-format` experiment).** `--format=jsonl` (one
+JSON object per entry, against a published schema) or `--format=md` (env `TG_FORMAT`) writes the
+catalog to stdout. **Without `--format`, `catalog` opens the TUI only when stdin and stdout are
+both terminals; anywhere else it writes `jsonl`** — so an agent or a pipe gets JSON, not a TUI:
+
+```bash
+terragrunt catalog --format=jsonl | jq -c '{kind, title, component_source}'
+```
 
 > **`scaffold` was wrong for units and stacks before v1.1.3, and exited 0 while being wrong.**
 > It read every source as an OpenTofu/Terraform module, so given a unit or a stack — which
@@ -418,6 +431,11 @@ Does not validate Terraform configurations.
   never uses. Without `--inputs` it is the general strict mode.
 - `--json`: Output validation results in JSON format
 
+**v1.2.0: `hcl validate` fails for every enabled `dependency` whose `config_path` has no unit
+or stack configuration** (a deleted or moved unit). Before v1.2.0 it passed and `run --all`
+failed later, so a CI step that ran `hcl validate` can turn red on upgrade — for a real
+problem. v1.2.0 also reads `-var`/`-var-file` in `extra_arguments` verbatim for `--inputs`.
+
 *Validate all Terragrunt files*
 ```bash
 terragrunt hcl validate
@@ -454,6 +472,11 @@ including paths, versions, environment variables, and resolved configuration val
 
 **Options:**
 - `--json`: Output in JSON format
+
+**v1.2.0: `info print --all` writes JSON Lines** (one object per unit) and reports each unit's
+own `download_dir` (`<unit>/.terragrunt-cache`); before, it printed indented objects one after
+another and gave every unit the root's `download_dir`. Anything parsing the old output breaks.
+Printing a single unit is unchanged.
 
 *Print configuration info*
 ```bash
@@ -610,7 +633,15 @@ dependencies defined in terragrunt.hcl files.
 - `--queue-ignore-dag-order`: Run without respecting DAG order (safe only for read-only ops; dangerous for apply)
 - `--queue-ignore-errors`: Continue processing remaining units even if one fails
 - `--queue-include-external`: Include external dependencies (units outside the current tree)
-- `--dependency-fetch-output-from-state`: Read dependency outputs from the state file instead of `tofu output` (S3 only; not with state encryption)
+- `--no-hooks` (env `TG_NO_HOOKS`): skip every `before_hook`, `after_hook` and `error_hook` for
+  the run. **GA on v1.2.0+**; experiment `optional-hooks` below that.
+- `--no-dependency-outputs` (env `TG_NO_DEPENDENCY_OUTPUTS`): skip output resolution for every
+  `dependency` — for `init` and `validate` only; `plan`/`apply` would get empty values. **GA on
+  v1.2.0+**; experiment `optional-dependency-outputs` on v1.1.3–v1.1.6.
+- `--profile-cpu` / `--profile-mem` / `--profile-goroutine <path>`, or `--profile-dir <dir>`
+  for all three (env `TG_PROFILE_*`): pprof profiles of Terragrunt itself, not of
+  OpenTofu/Terraform; read with `go tool pprof`. **GA on v1.2.0+**; experiment `profiling` below.
+- `--dependency-fetch-output-from-state`: Read dependency outputs from the state file instead of `tofu output` (S3 only; not with state encryption). **On v1.2.0+ this is the default for S3, GCS and azurerm**, falling back to `output -json`; the flag is deprecated, and `--no-dependency-fetch-output-from-state` (env `TG_NO_DEPENDENCY_FETCH_OUTPUT_FROM_STATE`) forces the old path
 - `--config`: Path to the Terragrunt configuration file
 - `--working-dir`: Directory to run Terragrunt in
 - `--source`: Override the source URL for the module
