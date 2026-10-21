@@ -60,9 +60,37 @@ Azure state" became true only on the default path; on v1.1.2+ with
 skill asks which version and which flags before advising, rather than asserting any of the
 three answers.
 
+### What v1.2.0 changed for this skill
+
+v1.2.0 (2026-10-21) completed eleven experiments: `azure-backend`, `block-iteration`,
+`bounded-discovery`, `catalog-format`, `dependency-fetch-output-from-state`,
+`mutable-generate`, `oci`, `optional-dependency-outputs`, `optional-hooks`, `profiling` and
+`version-attribute`. On v1.2.0+ the skill emits their features without a flag; below it, every
+v1.1.x gate still applies. The release candidates do not count as 1.2.0 —
+`scripts/preflight.py` reports an rc as below the gate.
+
+What the skill now warns about when you upgrade, because each one changes something without
+anyone opting in:
+
+- **Plans:** `base64gzip()` returns new bytes, so a resource comparing the encoded value plans a
+  replacement (`base64gzip_compat()` keeps the old bytes). S3 state bucket bootstrap no longer
+  adds the `RootAccess` statement (`enable_bucket_root_access = true` restores it).
+- **Permissions and resources:** generated files are read-only CAS links by default, so a
+  hook that edits one in place fails until that `generate` block sets `mutable = true`.
+  `--backend-bootstrap` now creates Azure state resources it used to skip.
+- **Scripts and CI:** `info print --all` writes JSON Lines; `catalog` writes `jsonl` instead of
+  opening the TUI off a terminal; `hcl validate` fails on a `dependency` whose unit is gone; a
+  malformed `exclude` block is an error rather than silently dropped.
+
+New in the references: `expansion` (`count`/`for_each` on `unit`, `stack` and `dependency`,
+referenced as `unit.<name>[key].path`), dependency outputs read from S3, GCS and azurerm state
+by default, Azure `minimum_tls_version`, and the `--no-hooks`, `--no-dependency-outputs`,
+`--profile-*` and `catalog --format` flags.
+
 So: **when a Terragrunt release lands, re-read the release body in full** before trusting
 these references. Not the summary — the Experiments section sits well below the fold, and
-skimming it is exactly how the above was nearly missed.
+skimming it is exactly how the v1.1.2 Azure reversal was nearly missed, and how the
+release-candidate warning missed the generated-file and Azure-bootstrap changes in v1.2.0.
 
 ## What it does NOT do
 
