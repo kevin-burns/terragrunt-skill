@@ -229,6 +229,12 @@ Docs: https://docs.terragrunt.com/features/run-queue/ · https://docs.terragrunt
   `--experiment opt-out-auth`. Only safe when parsing resolves without credentials (a unit
   using e.g. `get_aws_account_id()` at parse time will fail with it set). For a costly shared
   command, wrap it in `run_cmd("--terragrunt-global-cache", ...)` so it runs once per invocation.
+  From v1.2.1 that means once per environment and exact arguments, and concurrent units wait for
+  the first run instead of starting their own.
+- **Upgrade before tuning shared config or filters.** v1.2.1 parses a shared
+  `read_terragrunt_config` file once rather than per unit and narrows the discovery walk from path
+  `--filter`s. Gruntwork's benchmark: 5,000 units went from 34.2s to 1.88s. A filter that can
+  select anywhere (`name=vpc`, `...vpc`) or is negated still walks everything.
 - **Validate-only CI without touching a backend:** pass `-backend=false` to OpenTofu via
   `extra_arguments` (note: `remote_state.disable_init` now passes `-backend-config` and
   requires the backend to exist — it is not the same as `-backend=false`). Backend
@@ -243,7 +249,8 @@ Docs: https://docs.terragrunt.com/features/auto-init/ · https://docs.terragrunt
 - **Plan-diff detection:** pass tofu's detailed exit code after `--`:
   `terragrunt run --all plan -- -detailed-exitcode` → 0 none, 1 error, 2 changes. Terragrunt
   aggregates: any `1` ⇒ overall `1`; any `2` with no `1` ⇒ overall `2`. Great for "did
-  anything change?" gates across hundreds of units.
+  anything change?" gates across hundreds of units. **Below v1.2.1 a failure with no exit code
+  from the binary, such as it failing to start, recorded `0` and the unit reported success.**
 - **Run report:** `--report-file` / `--report-format` (csv|json) summarizes per-unit results
   of an `--all` run — useful as a CI artifact.
 

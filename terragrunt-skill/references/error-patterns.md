@@ -42,6 +42,8 @@
 - [ERROR: No Terraform configuration files found](#error-no-terraform-configuration-files-found)
 - [ERROR: ParentFileNotFoundError on a file that sits beside the config](#error-parentfilenotfounderror-on-a-file-that-sits-beside-the-config)
 - [ERROR: Remote state configuration missing](#error-remote-state-configuration-missing)
+- [ERROR: exclude block cannot reference dependency outputs](#error-exclude-block-cannot-reference-dependency-outputs)
+- [ERROR: Unsupported attribute in a file read with read_terragrunt_config](#error-unsupported-attribute-in-a-file-read-with-read_terragrunt_config)
 - [ERROR: Undefined local reference](#error-undefined-local-reference)
 - [ERROR: Working directory error](#error-working-directory-error)
 - [ERROR: Circular dependency detected](#error-circular-dependency-detected)
@@ -79,7 +81,7 @@
 > both of which were live and undocumented for four releases. Neither has been reproduced
 > against a binary; they are read from the changelog and labelled as such.
 >
-> **What that means for you.** Every entry names likely causes. **Of the 63 entries, only 51 carry a fix**, and an
+> **What that means for you.** Every entry names likely causes. **Of the 65 entries, only 53 carry a fix**, and an
 > entry with no `**Solutions:**` section has none to give — say so rather than improvising one.
 > An entry carrying a "Verified against terragrunt 1.1.3" line was checked against the binary
 > on that date; the rest were not, and may describe a pre-1.0 world. Flag and avoid pre-1.0
@@ -103,7 +105,7 @@ cause.
 - **authentication** (3): AWS credentials not found, Azure authentication required, GCP credentials not found
 - **backend** (5): S3 bucket does not exist, Access denied to backend, GCS bucket not found, Azure storage account not found, Azure backend 403 (shared key disabled / missing RBAC)
 - **provider** (1): azurerm provider requires subscription_id (v4+)
-- **configuration** (31): HCL that will not parse or evaluate, the seven `include` entries, the five `generate` entries, the five `locals` entries, the seven hook entries, No Terraform configuration files found, Missing required input variable, Remote state configuration missing, Invalid terraform source, Working directory error, ParentFileNotFoundError on a file that sits beside the config
+- **configuration** (33): HCL that will not parse or evaluate, the seven `include` entries, the five `generate` entries, the five `locals` entries, the seven hook entries, No Terraform configuration files found, Missing required input variable, Remote state configuration missing, Invalid terraform source, Working directory error, ParentFileNotFoundError on a file that sits beside the config
 - **dependency** (15): Circular dependency detected, Module not found, Could not download source, `invalid repository name` from a `depth=` query parameter (v1.1.0–1.1.3), `CAS processing failed … source escapes repository root` (v1.1.0–1.1.3), Git authentication failed, Git ref not found, Module subdirectory not found, Module registry unavailable, Module checksum mismatch…
 - **network** (2): Network timeout, Connection refused
 - **state** (3): Error acquiring state lock, Backend configuration changed, Failed to get existing workspaces
@@ -1237,6 +1239,54 @@ Remote state backend is not configured
 - remote_state block missing
 - Backend type not specified
 - Configuration incomplete
+
+## ERROR: exclude block cannot reference dependency outputs
+**Category:** configuration
+
+```
+exclude block in /live/app/terragrunt.hcl cannot reference dependency outputs; exclude blocks are evaluated before dependencies run
+```
+
+Reproduced on 1.2.1. It is an error on every command from v1.2.1. Before that, `run --all`
+ignored the block with a warning and ran the unit, while single-unit runs read the output.
+
+**Likely causes:**
+- `if = dependency.<name>.outputs.<key>` in an `exclude` block.
+
+**Solutions:**
+
+Base the exclusion on a `feature` flag or a local.
+
+```hcl
+feature "skip_app" {
+  default = false
+}
+
+exclude {
+  if      = feature.skip_app.value
+  actions = ["all"]
+}
+```
+
+## ERROR: Unsupported attribute in a file read with read_terragrunt_config
+**Category:** configuration
+
+```
+= This object does not have an attribute named "region".
+```
+
+Reproduced on 1.2.1. From v1.2.1 the read file's `include` and `feature` blocks evaluate without
+the reader's `local` and `feature` values. Before that, the same file could parse or fail
+depending on which unit read it.
+
+**Likely causes:**
+- A `feature` or `include` block in the shared file using `local.<name>` that only the reading
+  unit defines.
+
+**Solutions:**
+
+Define the value in the file being read, or move the block to the unit. To build a path from the
+reading unit's directory, call `get_original_terragrunt_dir()` in the file.
 
 ## ERROR: Undefined local reference
 **Category:** configuration

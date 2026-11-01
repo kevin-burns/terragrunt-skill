@@ -122,6 +122,10 @@ Two rules the docs are explicit about:
 - **A `--filter` must match between the plan and the apply.** Plan a narrower set than you
   apply and the apply fails on the units you never planned.
 
+- **From v1.2.1, units a Git filter selects go under `@<ref>/`**, such as
+  `<out-dir>/@HEAD/env/app/tfplan.tfplan`. Planning and applying with the same `--filter` still
+  find the same files, but a script that walks the directory must expect the extra level.
+
 Add `--json-out-dir` alongside `--out-dir` if you want machine-readable plans for a policy
 check or a PR comment.
 

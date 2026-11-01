@@ -196,6 +196,10 @@ the last block should keep only that block** — renaming both labels changes wh
 the inputs read. On ≤1.1.3 this is silent, so check by eye when reviewing a config that
 declares many dependencies.
 
+**v1.2.1 deprecates a `config_path` that names a file.** Use the directory, `../db`, not
+`../db/terragrunt.hcl`. It warns, and is an error under
+`--strict-control dependency-config-path-file`, which is also in the `deprecated-configs` group.
+
 **v1.1.5 widened the same control to a second shape: two labels, one `config_path`.**
 
 ```hcl
@@ -841,6 +845,10 @@ exclude {
 - `exclude_dependencies` (boolean, default `false`): whether the unit's dependencies are
   excluded too.
 - `no_run` (boolean): prevents execution for **single-unit** commands matching `actions`.
+
+**`if` cannot read dependency outputs.** The block is evaluated while the run queue is built,
+before any dependency has run. Under `run --all` such a block was ignored with a warning and the
+unit ran anyway. v1.2.1 rejects it on every command; verified on 1.2.1. Use a `feature` or a local.
 
 Exclusion applies when the `if` condition is true **and** the current action appears in
 `actions`.

@@ -106,6 +106,11 @@ GATES = (
         "still EXPERIMENTAL: base64gzip_compat() (--experiment base64gzip-compat), "
         "terragrunt mcp (--experiment mcp-command, not stable before v1.3)",
     )),
+    ("1.2.1", "advice, not syntax", (
+        "--strict-control dependency-config-path-file (also in deprecated-configs)",
+        "use_path_style in remote_state honoured by Terragrunt's own S3 requests",
+        "Build with Go 1.27.3: certificate verification fix, CVE-2026-111943",
+    )),
 )
 
 # Changes that break a working configuration on upgrade WITHOUT anyone enabling anything.
@@ -209,6 +214,21 @@ HAZARDS = {
         "exclude, hook and extra_arguments rules for destroy apply.",
         "S3 access-log buckets Terragrunt creates get a bucket policy, not an ACL; "
         "skip_accesslogging_bucket_acl is deprecated and does nothing.",
+    )),),
+    "1.2.1": ((None, (
+        "An exclude block referencing dependency outputs is now an error on every command. "
+        "Base it on a feature flag or a local.",
+        "A file read with read_terragrunt_config no longer sees the reader's local and feature "
+        "values in its include and feature blocks: 'Unsupported attribute'. Define the value "
+        "in the file being read.",
+        "dependency config_path naming a file now warns; use the directory.",
+        "run_cmd results are cached per environment and exact arguments, so a shared call can "
+        "run more than once where different environments reach it.",
+        "run -detailed-exitcode records 1, not 0, for a failure with no exit code: a CI gate "
+        "that was green on such a unit now fails.",
+        "hcl validate text output changed (relative path, line and column, caret). Parse "
+        "--json, which did not.",
+        "--out-dir and --json-out-dir put units a Git filter selects under @<ref>/ directories.",
     )),),
 }
 

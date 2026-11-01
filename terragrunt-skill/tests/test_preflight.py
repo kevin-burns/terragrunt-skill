@@ -144,13 +144,29 @@ def test_the_eleven_graduations_are_withheld_from_a_1_1_x_build():
 
 def test_1_2_0_emits_the_graduations_and_reports_its_hazards():
     out = lines_for("1.2.0")
-    assert "DO NOT EMIT" not in out
+    assert "expansion block" not in out.split("DO NOT EMIT", 1)[1]
     assert "expansion block" in out.split("UPGRADE HAZARDS", 1)[0]
     hazards = out.split("UPGRADE HAZARDS", 1)[1]
     for needle in ("RootAccess", "base64gzip_compat", "READ-ONLY", "--backend-bootstrap",
                    "JSON Lines", "hcl validate"):
         assert needle in hazards, needle
     assert "ahead of every gate" not in out
+
+
+def test_1_2_1_reports_its_hazards_and_is_the_newest_gate():
+    out = lines_for("1.2.1")
+    assert "DO NOT EMIT" not in out
+    hazards = out.split("UPGRADE HAZARDS", 1)[1]
+    for needle in ("exclude block", "read_terragrunt_config", "config_path", "run_cmd",
+                   "-detailed-exitcode", "--json", "@<ref>"):
+        assert needle in hazards, needle
+    assert "ahead of every gate" not in out
+
+
+def test_the_1_2_1_hazards_are_not_reported_on_1_2_0():
+    out = lines_for("1.2.0")
+    assert "read_terragrunt_config" not in out
+    assert "v1.2.1+" in out.split("DO NOT EMIT", 1)[1]
 
 
 def test_the_1_2_hazards_are_not_reported_below_1_2():
@@ -167,7 +183,7 @@ def test_a_1_2_release_candidate_does_not_reach_the_1_2_gate():
 
 def test_a_release_is_not_mistaken_for_a_pre_release():
     out = lines_for("terragrunt version v1.2.0\nbuilt with go1.27.1")
-    assert "PRE-RELEASE" not in out and "DO NOT EMIT" not in out
+    assert "PRE-RELEASE" not in out and "v1.2.0+" not in out.split("DO NOT EMIT", 1)[1]
 
 
 # ---------------------------------------------------------------------------

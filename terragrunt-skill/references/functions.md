@@ -176,7 +176,7 @@ Related: get_env
 
 **Signature:** `run_cmd([flags], command, ...args)`  |  **Returns:** string  |  **Category:** execution
 
-Runs a shell command and returns stdout as the result. Executes in the same folder as the terragrunt.hcl file. Supports special flags: --terragrunt-quiet (suppress output), --terragrunt-global-cache (cache globally), --terragrunt-no-cache (disable caching). Results are cached by default based on directory and command.
+Runs a shell command and returns stdout as the result. Executes in the same folder as the terragrunt.hcl file. Supports special flags: --terragrunt-quiet (suppress output), --terragrunt-global-cache (cache globally), --terragrunt-no-cache (disable caching). Results are cached by default based on directory and command; from v1.2.1 also per environment and exact arguments.
 
 **Parameters:**
 - `flags` (string, optional): Optional flags: --terragrunt-quiet, --terragrunt-global-cache, --terragrunt-no-cache
@@ -234,6 +234,8 @@ Related: read_terragrunt_config
 **Signature:** `read_terragrunt_config(config_path, [default_val])`  |  **Returns:** map  |  **Category:** file
 
 Parses a Terragrunt config file and returns a map of its contents. Exposes all blocks and attributes including locals, inputs, and dependency outputs. Also supports reading terragrunt.stack.hcl and terragrunt.values.hcl files.
+
+**v1.2.1:** the file's `include` and `feature` blocks evaluate without the reader's `local` and `feature` values in scope. Shared files are parsed once and reused, unless the result can differ per unit (`get_original_terragrunt_dir()`, `dependency` blocks).
 
 **Parameters:**
 - `config_path` (string, required): Path to the terragrunt config file to read

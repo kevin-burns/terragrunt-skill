@@ -17,7 +17,7 @@ the listed reference, act:
 | Scaffold configs, envs, stacks | GENERATE | `architecture-patterns.md` + `templates/` |
 | Validate / lint / CI | VALIDATE | `scripts/validate.sh`, `cli-reference.md` |
 | Review or audit a repo | REVIEW | `best-practices.md` |
-| An error was pasted | DIAGNOSE | grep `error-patterns.md` — 63 diagnosed errors, 51 with a fix |
+| An error was pasted | DIAGNOSE | grep `error-patterns.md` — 65 diagnosed errors, 53 with a fix |
 | "What does X do" | LOOKUP | grep the matching reference |
 | Multi-account, mocks, AVM, CFT | EXAMPLES | `advanced-examples.md` — 28 worked examples |
 | OIDC, plan-then-apply pipelines | CI/CD | `cicd.md` |
@@ -86,6 +86,15 @@ New in the references: `expansion` (`count`/`for_each` on `unit`, `stack` and `d
 referenced as `unit.<name>[key].path`), dependency outputs read from S3, GCS and azurerm state
 by default, Azure `minimum_tls_version`, and the `--no-hooks`, `--no-dependency-outputs`,
 `--profile-*` and `catalog --format` flags.
+
+### What v1.2.1 changed for this skill
+
+v1.2.1 (2026-10-23) graduated nothing, and the skill recommends it over v1.2.0 for a Go security
+fix. Configs can newly fail: an `exclude` block reading dependency outputs is an error, and a file
+read with `read_terragrunt_config` no longer sees the reader's locals. A `config_path` naming a
+file is deprecated. CI can change too: `-detailed-exitcode` stops reporting some failures as
+success, `hcl validate` text output moved (`--json` did not), and `--out-dir` adds `@<ref>/`
+directories for Git-filtered units.
 
 So: **when a Terragrunt release lands, re-read the release body in full** before trusting
 these references. Not the summary — the Experiments section sits well below the fold, and

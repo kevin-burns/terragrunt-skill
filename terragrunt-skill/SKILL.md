@@ -227,6 +227,27 @@ read ONLY the listed reference(s), then act. References are grep-friendly — pr
      first-party source for the "look it up" rule below.
 
 
+   **v1.2.1 (released 2026-10-23) graduated nothing and carries behaviour changes.** Recommend it
+   over v1.2.0: it is built with Go 1.27.3, a security fix in certificate verification
+   (CVE-2026-111943) that covers every HTTPS connection Terragrunt makes.
+   - **`exclude` cannot reference dependency outputs**, on any command. It never worked under
+     `run --all`, which ignored the block and ran the unit. Base it on a `feature` or a local.
+   - **A file read with `read_terragrunt_config` is isolated from its reader:** its `include`
+     and `feature` blocks no longer see the reader's `local` and `feature` values. Define the
+     value in the file being read. Both of these fail with errors in `error-patterns.md`.
+   - **New strict control `dependency-config-path-file`.** `config_path` naming a file now
+     warns, and is an error under the control. Emit the directory, `../db`, never
+     `../db/terragrunt.hcl`.
+   - **`run_cmd` results are cached per environment and exact arguments,** so a shared call no
+     longer hands the first unit's credentials' output to every unit, and concurrent units
+     share one run.
+   - **`-detailed-exitcode` no longer reports a failure with no exit code as success.** Below
+     v1.2.1 such a unit recorded `0`, so do not trust a green plan gate there.
+   - **Scripts:** `hcl validate` text output changed, so parse `--json`, which did not.
+     `--out-dir` puts units a Git filter selects under `@<ref>/` directories.
+   - **New, no gate beyond v1.2.1:** `use_path_style` in `remote_state` is honoured by
+     Terragrunt's own S3 requests. The preflight lists all of this.
+
    These references cover only some of the active experiments, so an unfamiliar `--experiment` value
    is not evidence that it is wrong — look it up rather than flagging it. For anything newer,
    niche, or not found in the references, look it up — do not guess. In order:
@@ -270,7 +291,7 @@ the fastest route to an answer is the grep handle, not the filename.
 
 | Reference | Holds | Entries | Grep handle |
 |---|---|---|---|
-| `error-patterns.md` | diagnosed errors: likely causes for every one, a fix for 51 | 63 | `^## ERROR:` |
+| `error-patterns.md` | diagnosed errors: likely causes for every one, a fix for 53 | 65 | `^## ERROR:` |
 | `functions.md` | built-in functions by category | 31 | `^## FUNCTION:` |
 | `best-practices.md` | practices, plus comparisons and decision guides | 29 / 7 / 3 | `^## PRACTICE:` `^## COMPARISON:` `^## DECISION:` |
 | `cli-reference.md` | the 1.x command tree and the `--filter` system | 24 | `^## COMMAND:` |
@@ -293,7 +314,7 @@ Counts are verified against the files, not asserted: regenerate with
 - `references/functions.md` — built-in functions by category. `grep '^## FUNCTION: get_env'`
 - `references/cli-reference.md` — full 1.0 command tree + `--filter` system.
   `grep '^## COMMAND: stack run'`
-- `references/error-patterns.md` — 63 diagnosed errors. Every one names likely causes; **51
+- `references/error-patterns.md` — 65 diagnosed errors. Every one names likely causes; **53
   carry a fix**, and an entry with no `**Solutions:**` section has none to give — say so
   rather than improvising one. Grep error keywords first:
   `grep -in 'state lock' references/error-patterns.md`
