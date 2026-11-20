@@ -153,14 +153,31 @@ def test_1_2_0_emits_the_graduations_and_reports_its_hazards():
     assert "ahead of every gate" not in out
 
 
-def test_1_2_1_reports_its_hazards_and_is_the_newest_gate():
+def test_1_2_1_reports_its_hazards():
     out = lines_for("1.2.1")
-    assert "DO NOT EMIT" not in out
+    assert "v1.2.1+" not in out.split("DO NOT EMIT", 1)[1]
     hazards = out.split("UPGRADE HAZARDS", 1)[1]
     for needle in ("exclude block", "read_terragrunt_config", "config_path", "run_cmd",
                    "-detailed-exitcode", "--json", "@<ref>"):
         assert needle in hazards, needle
     assert "ahead of every gate" not in out
+
+
+def test_1_2_2_reports_its_hazards_and_is_the_newest_gate():
+    out = lines_for("1.2.2")
+    assert "DO NOT EMIT" not in out
+    hazards = out.split("UPGRADE HAZARDS", 1)[1]
+    for needle in ("config_path = null", "enabled = false", "null value is not allowed",
+                   "actions = []", "cas-source-inside-stack", "inputs-read-not-tracked",
+                   "--working-dir", "tofu_command"):
+        assert needle in hazards, needle
+    assert "ahead of every gate" not in out
+
+
+def test_the_1_2_2_hazards_are_not_reported_on_1_2_1():
+    out = lines_for("1.2.1")
+    assert "inputs-read-not-tracked" not in out
+    assert "v1.2.2+" in out.split("DO NOT EMIT", 1)[1]
 
 
 def test_the_1_2_1_hazards_are_not_reported_on_1_2_0():

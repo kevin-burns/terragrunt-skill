@@ -23,7 +23,7 @@ the listed reference, act:
 | Scaffold configs, envs, stacks | GENERATE | `architecture-patterns.md` + `templates/` |
 | Validate / lint / CI | VALIDATE | `scripts/validate.sh`, `cli-reference.md` |
 | Review or audit a repo | REVIEW | `best-practices.md` |
-| An error was pasted | DIAGNOSE | grep `error-patterns.md` — 65 diagnosed errors, 53 with a fix |
+| An error was pasted | DIAGNOSE | grep `error-patterns.md` — 69 diagnosed errors, 57 with a fix |
 | "What does X do" | LOOKUP | grep the matching reference |
 | Multi-account, mocks, AVM, CFT | EXAMPLES | `advanced-examples.md` — 28 worked examples |
 | OIDC, plan-then-apply pipelines | CI/CD | `cicd.md` |
@@ -102,6 +102,17 @@ file is deprecated. CI can change too: `-detailed-exitcode` stops reporting some
 success, `hcl validate` text output moved (`--json` did not), and `--out-dir` adds `@<ref>/`
 directories for Git-filtered units.
 
+### What v1.2.2 changed for this skill
+
+v1.2.2 (2026-11-11) graduated nothing, and configs can newly fail. A `dependency` with a null
+`config_path` is an error unless `enabled = false`, and an `exclude` with a null or missing `if`
+stops `run --all` before any unit runs. Both used to pass silently and do the wrong thing. A
+`update_source_with_cas` source inside its own stack directory is deprecated (strict control
+`cas-source-inside-stack`). Reading and Git filters miss files read in `inputs`, and a new tip says
+so. `render`, `info print` and `aws-provider-patch --all` now honour filters, and OpenTelemetry
+attribute names changed. Two experiments arrived: `variables-block` and `no-dot-terragrunt-cache`.
+The null `config_path`, null `if`, strict control and `inputs` read were reproduced on 1.2.2.
+
 So: **when a Terragrunt release lands, re-read the release body in full** before trusting
 these references. Not the summary — the Experiments section sits well below the fold, and
 skimming it is exactly how the v1.1.2 Azure reversal was nearly missed, and how the
@@ -117,7 +128,8 @@ release-candidate warning missed the generated-file and Azure-bootstrap changes 
   producing a plausible-looking account ID or secret.
 - **It does not cover every experiment.** Eighteen were active as of v1.1.3, v1.1.5 added
   `offline-cas`, `base64gzip-compat` and a reserved `tg-login`, v1.2.0 completed eleven and
-  added `mcp-command`, and these references cover only some. An unfamiliar `--experiment` value is *not* evidence that it
+  added `mcp-command`, v1.2.2 added `variables-block` and `no-dot-terragrunt-cache`, and these
+  references cover only some. An unfamiliar `--experiment` value is *not* evidence that it
   is wrong — look it up rather than flagging it.
 - **It does not assume OpenTofu or Terraform.** Terragrunt orchestrates either; the skill
   reads your repo for the signal (`.terraform-version`, `terraform_binary`, provider

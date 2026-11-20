@@ -111,6 +111,13 @@ GATES = (
         "use_path_style in remote_state honoured by Terragrunt's own S3 requests",
         "Build with Go 1.27.3: certificate verification fix, CVE-2026-111943",
     )),
+    ("1.2.2", "advice, not syntax", (
+        "--strict-control cas-source-inside-stack (also in deprecated-configs)",
+        "remote_state encryption fallback = { method = \"unencrypted\" } to encrypt existing state",
+        "update_source_with_cas in stacks sourced from oci:// and HTTP archives",
+        "still EXPERIMENTAL: variables block (--experiment variables-block), "
+        "terraform.no_dot_terragrunt_cache (--experiment no-dot-terragrunt-cache)",
+    )),
 )
 
 # Changes that break a working configuration on upgrade WITHOUT anyone enabling anything.
@@ -229,6 +236,24 @@ HAZARDS = {
         "hcl validate text output changed (relative path, line and column, caret). Parse "
         "--json, which did not.",
         "--out-dir and --json-out-dir put units a Git filter selects under @<ref>/ directories.",
+    )),),
+    "1.2.2": ((None, (
+        "A dependency with config_path = null is an error unless enabled = false; it used to be "
+        "dropped silently. Set enabled with any conditional config_path.",
+        "An exclude block whose if is null or missing fails run --all while the queue is built "
+        "('null value is not allowed'). Set if to true or false.",
+        "run --all follows the unit's own blocks over included ones: actions = [] in a unit's "
+        "exclude turns off an included exclude, and an overridden dependency replaces the "
+        "included path in the run order.",
+        "update_source_with_cas on a source inside its own stack directory warns "
+        "(cas-source-inside-stack); move the source out and select the stack with //.",
+        "render, info print and aws-provider-patch --all now honour --filter, and backend "
+        "bootstrap|delete --all honour .terragrunt-filters: scripts act on fewer units.",
+        "Reading and Git filters ignore files read in inputs (tip inputs-read-not-tracked); "
+        "read them in locals. Reads in a stack's unit/stack values are now tracked.",
+        "scaffold resolves relative --output-folder and --var-file against --working-dir.",
+        "OpenTelemetry: terraformCommand / terraform_command -> tofu_command, "
+        "terraform_cli_args -> tofu_cli_args; <command>_duration keeps only the dir label.",
     )),),
 }
 

@@ -44,6 +44,10 @@
 - [ERROR: Remote state configuration missing](#error-remote-state-configuration-missing)
 - [ERROR: exclude block cannot reference dependency outputs](#error-exclude-block-cannot-reference-dependency-outputs)
 - [ERROR: Unsupported attribute in a file read with read_terragrunt_config](#error-unsupported-attribute-in-a-file-read-with-read_terragrunt_config)
+- [ERROR: dependency sets config_path to null](#error-dependency-sets-config_path-to-null)
+- [ERROR: Unsuitable value: null value is not allowed (exclude if)](#error-unsuitable-value-null-value-is-not-allowed-exclude-if)
+- [ERROR: update_source_with_cas source inside the stack directory](#error-update_source_with_cas-source-inside-the-stack-directory)
+- [ERROR: encountered unencrypted payload without unencrypted method configured](#error-encountered-unencrypted-payload-without-unencrypted-method-configured)
 - [ERROR: Undefined local reference](#error-undefined-local-reference)
 - [ERROR: Working directory error](#error-working-directory-error)
 - [ERROR: Circular dependency detected](#error-circular-dependency-detected)
@@ -81,7 +85,7 @@
 > both of which were live and undocumented for four releases. Neither has been reproduced
 > against a binary; they are read from the changelog and labelled as such.
 >
-> **What that means for you.** Every entry names likely causes. **Of the 65 entries, only 53 carry a fix**, and an
+> **What that means for you.** Every entry names likely causes. **Of the 69 entries, only 57 carry a fix**, and an
 > entry with no `**Solutions:**` section has none to give — say so rather than improvising one.
 > An entry carrying a "Verified against terragrunt 1.1.3" line was checked against the binary
 > on that date; the rest were not, and may describe a pre-1.0 world. Flag and avoid pre-1.0
@@ -105,10 +109,10 @@ cause.
 - **authentication** (3): AWS credentials not found, Azure authentication required, GCP credentials not found
 - **backend** (5): S3 bucket does not exist, Access denied to backend, GCS bucket not found, Azure storage account not found, Azure backend 403 (shared key disabled / missing RBAC)
 - **provider** (1): azurerm provider requires subscription_id (v4+)
-- **configuration** (33): HCL that will not parse or evaluate, the seven `include` entries, the five `generate` entries, the five `locals` entries, the seven hook entries, No Terraform configuration files found, Missing required input variable, Remote state configuration missing, Invalid terraform source, Working directory error, ParentFileNotFoundError on a file that sits beside the config
-- **dependency** (15): Circular dependency detected, Module not found, Could not download source, `invalid repository name` from a `depth=` query parameter (v1.1.0–1.1.3), `CAS processing failed … source escapes repository root` (v1.1.0–1.1.3), Git authentication failed, Git ref not found, Module subdirectory not found, Module registry unavailable, Module checksum mismatch…
+- **configuration** (34): HCL that will not parse or evaluate, the seven `include` entries, the five `generate` entries, the five `locals` entries, the seven hook entries, No Terraform configuration files found, Missing required input variable, Remote state configuration missing, Invalid terraform source, Working directory error, ParentFileNotFoundError on a file that sits beside the config
+- **dependency** (17): Circular dependency detected, Module not found, Could not download source, `invalid repository name` from a `depth=` query parameter (v1.1.0–1.1.3), `CAS processing failed … source escapes repository root` (v1.1.0–1.1.3), Git authentication failed, Git ref not found, Module subdirectory not found, Module registry unavailable, Module checksum mismatch…
 - **network** (2): Network timeout, Connection refused
-- **state** (3): Error acquiring state lock, Backend configuration changed, Failed to get existing workspaces
+- **state** (4): Error acquiring state lock, Backend configuration changed, Failed to get existing workspaces, encountered unencrypted payload without unencrypted method configured
 - **terraform** (3): Terraform version constraint not met, Provider not found, Provider version constraint
 
 ## ERROR: AWS credentials not found
@@ -1287,6 +1291,103 @@ depending on which unit read it.
 
 Define the value in the file being read, or move the block to the unit. To build a path from the
 reading unit's directory, call `get_original_terragrunt_dir()` in the file.
+
+## ERROR: dependency sets config_path to null
+**Category:** dependency
+
+```
+/live/app/terragrunt.hcl: dependency db sets config_path to null; set it to a path, or set enabled to false
+```
+
+Reproduced on 1.2.2. It is an error from v1.2.2. Before that the block was dropped without a
+warning: a reference to it failed later with `This object does not have an attribute named "db"`,
+and nulling an included block's `config_path` did not remove it.
+
+**Likely causes:**
+- A conditional `config_path = local.x ? "../db" : null` with no `enabled`.
+- Trying to switch off an included `dependency` by nulling its path.
+
+**Solutions:**
+
+Set `enabled` from the same condition. A disabled block may keep a null path, and its
+`mock_outputs` stay available.
+
+```hcl
+dependency "db" {
+  config_path  = local.use_db ? "../db" : null
+  enabled      = local.use_db
+  mock_outputs = { id = "mock" }
+}
+```
+
+## ERROR: Unsuitable value: null value is not allowed (exclude if)
+**Category:** configuration
+
+```
+Error: Unsuitable value type
+  on /live/db/terragrunt.hcl line 4, in exclude:
+   4:   if = local.skip
+Unsuitable value: null value is not allowed
+```
+
+Reproduced on 1.2.2 under `run --all`. From v1.2.2 `run --all` fails while building the queue,
+before any unit runs. Below v1.2.2 the block excluded nothing from `run --all`: the unit failed on
+its own, and the dependencies `exclude_dependencies = true` should have held back still ran.
+
+**Likely causes:**
+- `if` set from a local or feature that evaluates to `null`.
+- An `exclude` block with no `if` at all.
+
+**Solutions:**
+
+Give `if` a boolean: `if = coalesce(local.skip, false)`, or default the feature flag to `false`.
+
+## ERROR: update_source_with_cas source inside the stack directory
+**Category:** dependency
+
+```
+failed to fetch stack "bar" via CAS: stack bar: unit "foo" in terragrunt.stack.hcl sets update_source_with_cas on source "./units/foo" inside the stack directory, so the generated stack also contains a copy of it; move the source out of the stack directory and select the stack with a // subdirectory in its source
+```
+
+Reproduced on 1.2.2. A warning from v1.2.2; an error under `--strict-control
+cas-source-inside-stack` or the `deprecated-configs` group. Stack generation copies the stack
+directory whole, so the unit appeared twice and `run --all` ran the copy without its values.
+
+**Likely causes:**
+- A catalog with `terragrunt.stack.hcl` at its root and units under `units/`, consumed by a
+  `stack` block with `source = "../catalog"`.
+
+**Solutions:**
+
+Move the stack file into a subdirectory such as `catalog/stacks/bar`, keep the unit sources
+outside it, and select it with `source = "../catalog//stacks/bar"`.
+
+## ERROR: encountered unencrypted payload without unencrypted method configured
+**Category:** state
+
+```
+Error: Error refreshing state
+
+encountered unencrypted payload without unencrypted method configured
+```
+
+From the v1.2.2 release notes, not reproduced here. Adding `encryption` to the `remote_state` of a
+unit that already has plaintext state; below v1.2.2 Terragrunt could not generate the fallback.
+
+**Likely causes:**
+- `remote_state { encryption = { … } }` added to an existing unit.
+
+**Solutions:**
+
+On v1.2.2+, add a fallback for one apply, then remove it (and optionally set `enforced = true`):
+
+```hcl
+encryption = {
+  key_provider = "pbkdf2"
+  passphrase   = get_env("PBKDF2_PASSPHRASE")
+  fallback     = { method = "unencrypted" }
+}
+```
 
 ## ERROR: Undefined local reference
 **Category:** configuration

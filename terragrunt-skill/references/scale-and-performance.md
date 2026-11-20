@@ -59,6 +59,13 @@ match the units whose files changed.
 - **Reads outside the unit count too:** if a unit `reading=` a shared file (or via
   `mark_glob_as_read()`) and that file changed, the unit is treated as affected — so a tweak
   to a shared `_env/region.hcl` correctly re-plans its consumers, not just the file's folder.
+- **…but not a read inside `inputs`.** A `file()` / `templatefile()` call in `inputs` (or in an
+  `autoinclude` block's `inputs`) is not recorded, so neither `reading=` nor a Git filter selects
+  the unit when that file changes. Read it in `locals` and reference the local. v1.2.2 prints the
+  `inputs-read-not-tracked` tip at each such read (`--no-tip inputs-read-not-tracked` silences
+  it); reproduced on 1.2.2. **Stacks:** below v1.2.2 a read in a `unit`/`stack` block's `values`
+  was not tracked either, so the stack was never regenerated; v1.2.2 tracks reads anywhere in a
+  stack file except `autoinclude`.
 - **Local module files now count (v1.1.0):** when a unit's `terraform` `source` is a local
   directory, Terragrunt records that module's `*.tf`, `*.tf.json`, `*.hcl`, `*.tofu`,
   `*.tofu.json` files as read, so changing a local module selects its units via `reading=` /
@@ -284,4 +291,5 @@ performance techniques here don't require it.
 - v1.1.1 release notes: https://github.com/gruntwork-io/terragrunt/releases/tag/v1.1.1
 - v1.1.3 release notes: https://github.com/gruntwork-io/terragrunt/releases/tag/v1.1.3 — two provider-cache race conditions fixed; `providers lock` space-delimited flag values; `--filter` now reserves `(`/`)` unconditionally and applies positive expressions after a leading negation; `tflint` hook honours `--config=`; `scaffold` fixed for units and stacks; five experiments added, none graduated
 - v1.1.2 release notes: https://github.com/gruntwork-io/terragrunt/releases/tag/v1.1.2 — provider cache server download endpoint now requires the run's secret path segment; `find_in_parent_folders()` 7–10x faster; local-source hashing honours `include_in_copy`/`exclude_from_copy` so uncopied files no longer force a re-init
+- v1.2.2 release notes: https://github.com/gruntwork-io/terragrunt/releases/tag/v1.2.2 — dependency discovery linear in unit count (10,000 units: 1.32 s → 443 ms in Gruntwork's benchmark), fewer symlink syscalls with dependent filters, `--all` honours filters outside `run`, reads in stack `values` tracked, `inputs-read-not-tracked` tip, `--provider-cache` uses a per-user `$TMPDIR/terragrunt-<uid>`; experiments `variables-block` and `no-dot-terragrunt-cache` added, none graduated
 - run command flags & exit codes: https://docs.terragrunt.com/reference/cli/commands/run/

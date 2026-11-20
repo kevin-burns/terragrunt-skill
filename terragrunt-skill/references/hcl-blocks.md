@@ -138,6 +138,21 @@ dependency "<label>" { ... }
 **Attributes:**
 - `config_path` (string, required): Relative or absolute path to the dependency's terragrunt.hcl directory.
 - `enabled` (boolean): Whether this dependency is enabled. Useful for conditional dependencies.
+  **v1.2.2+: `config_path = null` on an enabled block is an error** (`dependency db sets
+  config_path to null; set it to a path, or set enabled to false`). Below v1.2.2 such a block was
+  dropped silently, a reference to it then failed with `This object does not have an attribute
+  named "db"`, and nulling an included block's path did not remove it. Pair a conditional path
+  with `enabled`; a disabled block keeps its `mock_outputs`. Reproduced on 1.2.2.
+  ```hcl
+  dependency "db" {
+    config_path  = local.use_db ? "../db" : null
+    enabled      = local.use_db
+    mock_outputs = { id = "mock" }
+  }
+  ```
+  **v1.2.2:** a unit that overrides or disables an included `dependency` is now ordered by
+  `run --all` after its own path only; before, it still waited on the included path and was
+  skipped when that unit failed.
 - `skip_outputs` (boolean): Skip fetching outputs from this dependency (useful for destroy operations).
 - `mock_outputs` (map): Mock output values to use when the dependency hasn't been applied yet.
   **v1.1.3 widened when these actually apply, twice.** With
@@ -509,6 +524,18 @@ Related: locals, terraform, remote_state
 
 Specifies the input variables to pass to the Terraform module. These values are automatically converted to TF_VAR_* environment variables when Terraform is executed.
 
+**Read files in `locals`, not in `inputs`.** Reading and Git filters (`--filter 'reading=…'`,
+`--filter '[main...HEAD]'`) do not see a `file()`, `yamldecode(file(…))` or `templatefile()` call
+inside `inputs`, so a change to that file does not select the unit. Read it in `locals` (or
+`mark_as_read` it there) and reference the local. v1.2.2 prints the `inputs-read-not-tracked`
+tip at each such read; reproduced on 1.2.2, where the filter matched only after the move.
+
+**Inputs too large for the environment:** the v1.2.2 `variables-block` experiment adds a
+`variables` block whose `kind` is `env` (default, `TF_VAR_*`), `tfvar` (`terragrunt.auto.tfvars`)
+or `json` (`terragrunt.auto.tfvars.json`). Experimental: emit only where the repo already runs
+with `--experiment variables-block`; with it on, those two file names are reserved in
+`.terragrunt-cache`.
+
 **Syntax:**
 ```hcl
 inputs = { ... }
@@ -636,6 +663,11 @@ remote_state { ... }
 - `disable_init` (boolean): When `true`, skip Terragrunt's automatic creation/management of remote state resources (S3 buckets, lock tables, GCS buckets) while still letting OpenTofu/Terraform initialize an already-provisioned backend. (No effect for `azurerm`, which is never auto-created.)
 - `disable_dependency_optimization` (boolean): Disable the optimized dependency-output fetching for modules using this block.
 - `encryption` (map): Configures OpenTofu state/plan encryption; transformed into an `encryption` block. Cloud-agnostic (OpenTofu only).
+  **Adding it to a unit that already has plaintext state** fails `tofu init` with
+  `encountered unencrypted payload without unencrypted method configured`. From v1.2.2 set
+  `fallback = { method = "unencrypted" }` in the map for one apply (OpenTofu rewrites the state
+  encrypted), then remove it; `enforced = true` then refuses plaintext. From the v1.2.2 release
+  notes, not reproduced here.
 
 *S3 backend with DynamoDB locking*
 ```hcl
@@ -839,9 +871,13 @@ exclude {
 ```
 
 **Attributes** (all optional):
-- `if` (boolean): the condition deciding whether the exclusion applies.
+- `if` (boolean): the condition deciding whether the exclusion applies. **Always emit it as a
+  boolean.** A null or missing `if` excluded nothing under `run --all`, so the dependencies
+  `exclude_dependencies = true` was meant to hold back still ran; v1.2.2 fails the run while
+  building the queue with `Unsuitable value: null value is not allowed` (reproduced on 1.2.2).
 - `actions` (list of strings): which actions to exclude when the condition holds. Documented
-  values: `"plan"`, `"apply"`, `"all"`, `"all_except_output"`.
+  values: `"plan"`, `"apply"`, `"all"`, `"all_except_output"`. `actions = []` in a unit turns
+  off an included `exclude`; `run --all` honours that only from v1.2.2 (single-unit runs always did).
 - `exclude_dependencies` (boolean, default `false`): whether the unit's dependencies are
   excluded too.
 - `no_run` (boolean): prevents execution for **single-unit** commands matching `actions`.
@@ -883,6 +919,11 @@ terraform { ... }
 ```
 
 **Attributes:**
+- `no_dot_terragrunt_cache` (boolean, **experimental, v1.2.2+**, `--experiment
+  no-dot-terragrunt-cache`): run OpenTofu/Terraform in the unit directory instead of a copy in
+  `.terragrunt-cache`, so local module paths resolve as written. Only on a unit **without** a
+  `source`; setting it with a `source`, or without the experiment, is an error. Merged through
+  `include`.
 - `source` (string, required): where to fetch the module from — local path, Git URL, S3, GCS, an OCI image reference, or a `tfr://` registry address. **A bare `tfr:///` does not resolve to a fixed registry — see the subsection below before using one.**
 - `version` (string): **GA on v1.2.0+; experiment `version-attribute` on v1.1.1–v1.1.6.** Resolves a `tfr://` registry module by version constraint instead of pinning an exact version in the source URL. Below v1.2.0 it is not available without the experiment flag — see below.
 - `include_in_copy` (list): List of glob patterns for additional files to copy to the Terraform working directory. **v1.1.2 note:** for a *local* `source`, Terragrunt decides whether its cached copy is stale by hashing the source directory. Before v1.1.2 that hash covered every file in the directory — hidden files and `exclude_from_copy` matches included — so creating or touching a file that is never copied (an editor swap file, a scratch note) forced a needless re-copy and auto-init on the next run. The hash now covers only the files a copy would actually deliver, honouring the default hidden-file rule alongside `include_in_copy` and `exclude_from_copy`. **v1.1.3 note:** with the `fast-copy` strict control enabled, a hidden directory copied because `include_in_copy` matched something inside it took the permissions of the first file generated within it rather than its own source permissions. Such directories now keep their source permissions, matching the copy performed with the control disabled.
@@ -904,6 +945,14 @@ terraform { ... }
   the `source` must be a literal string (interpolation, function calls and references such as
   `local.foo` all cause stack generation to fail), and `--no-cas` must NOT be set or Terragrunt
   errors out. Valid on `unit` in a `terragrunt.stack.hcl` as well — see `## BLOCK: unit`.
+  **Keep the source outside the stack's own directory (v1.2.2 strict control
+  `cas-source-inside-stack`, also in `deprecated-configs`).** Generation copies the stack
+  directory whole, so a source under it lands twice and `run --all` also runs the copy, without
+  the values the stack gives it. v1.2.2 warns; under the control it is an error. Put the stack in
+  a subdirectory of the catalog and select it with `//`: `source = "../catalog//stacks/bar"`.
+  Reproduced on 1.2.2. From v1.2.2 it also works in stacks sourced from `oci://` or an HTTP
+  archive (below v1.2.2 generation failed with `relative paths require a module with a pwd`),
+  and a nested source that cannot be rewritten fails generation instead of being left relative.
 - `before_hook` (block): Nested block to execute commands before Terraform runs.
 - `after_hook` (block): Nested block to execute commands after Terraform runs.
 - `error_hook` (block): Nested block to execute commands when Terraform encounters an error.

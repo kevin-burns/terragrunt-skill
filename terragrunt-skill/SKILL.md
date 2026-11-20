@@ -248,6 +248,46 @@ read ONLY the listed reference(s), then act. References are grep-friendly — pr
    - **New, no gate beyond v1.2.1:** `use_path_style` in `remote_state` is honoured by
      Terragrunt's own S3 requests. The preflight lists all of this.
 
+   **v1.2.2 (released 2026-11-11) graduated nothing; configs can newly fail.** Built with Go
+   1.27.4, which Gruntwork says changes no behaviour. Recommend it over v1.2.1.
+   - **A `dependency` with `config_path = null` is an error unless `enabled = false`.** It used
+     to be dropped silently, so a reference to it failed later and an included block could not
+     be removed by nulling its path. Emit `enabled` alongside any conditional `config_path`;
+     a disabled block keeps its `mock_outputs`. Reproduced on 1.2.2.
+   - **An `exclude` block whose `if` is null or missing fails `run --all`** while the queue is
+     built (`Unsuitable value: null value is not allowed`). It used to exclude nothing, so the
+     dependencies `exclude_dependencies = true` was meant to keep out still ran. Always emit
+     `if` as a boolean. Reproduced on 1.2.2.
+   - **`run --all` now obeys the unit's own blocks over included ones:** `actions = []` in a
+     unit's `exclude` turns off an included `exclude`, and a unit that overrides (or disables)
+     an included `dependency` is ordered after the new path only.
+   - **New strict control `cas-source-inside-stack`** (also in `deprecated-configs`). A
+     `unit`/`stack` with `update_source_with_cas` whose source sits inside its own stack
+     directory warns: generation copies that directory whole, so `run --all` also runs a copy
+     without its values. Put the stack in a subdirectory of the catalog and select it with
+     `//`, e.g. `source = "../catalog//stacks/bar"`. Reproduced on 1.2.2.
+   - **Reading and Git filters do not see a file read in `inputs`.** Read it in `locals` (or
+     `mark_as_read` it) and reference the local; the new `inputs-read-not-tracked` tip points
+     at each such read. A read in a stack's `unit`/`stack` `values` is now tracked. Reproduced
+     on 1.2.2: `--filter 'reading=…'` matched nothing until the read moved to `locals`.
+   - **`--all` honours filters outside `run`:** `render`, `info print` and
+     `aws-provider-patch` used to act on every unit, and `backend bootstrap|delete --all`
+     ignored `.terragrunt-filters`. A script that relied on that now acts on fewer units.
+   - **Fixes worth knowing:** `remote_state` `encryption` on existing plaintext state works
+     with `fallback = { method = "unencrypted" }` for one apply; `update_source_with_cas` works
+     in stacks sourced from OCI or HTTP archives; CAS honours `sshkey`; `scaffold` resolves
+     `--output-folder` and `--var-file` against `--working-dir`; S3 bootstrap no longer
+     crashes on a store that returns an empty encryption document; `--provider-cache` uses a
+     per-user `$TMPDIR/terragrunt-<uid>`; dependency discovery is linear in unit count.
+   - **Experiments (opt-in, do not emit unless the repo enables them):** `variables-block`
+     adds a `variables` block whose `kind` passes inputs as `TF_VAR_` env (default), a
+     `terragrunt.auto.tfvars` or `.json` file — for units whose inputs exceed the OS
+     environment limit; `no-dot-terragrunt-cache` adds `terraform { no_dot_terragrunt_cache =
+     true }` to run a source-less unit in place. `mcp-command` gains `catalog`, `fmt`,
+     `scaffold` tools and `--allow=docs`. **Telemetry users:** `otel` span attributes were
+     renamed (`terraformCommand`/`terraform_command` → `tofu_command`,
+     `terraform_cli_args` → `tofu_cli_args`) and `<command>_duration` has one label, `dir`.
+
    These references cover only some of the active experiments, so an unfamiliar `--experiment` value
    is not evidence that it is wrong — look it up rather than flagging it. For anything newer,
    niche, or not found in the references, look it up — do not guess. In order:
@@ -291,7 +331,7 @@ the fastest route to an answer is the grep handle, not the filename.
 
 | Reference | Holds | Entries | Grep handle |
 |---|---|---|---|
-| `error-patterns.md` | diagnosed errors: likely causes for every one, a fix for 53 | 65 | `^## ERROR:` |
+| `error-patterns.md` | diagnosed errors: likely causes for every one, a fix for 57 | 69 | `^## ERROR:` |
 | `functions.md` | built-in functions by category | 31 | `^## FUNCTION:` |
 | `best-practices.md` | practices, plus comparisons and decision guides | 29 / 7 / 3 | `^## PRACTICE:` `^## COMPARISON:` `^## DECISION:` |
 | `cli-reference.md` | the 1.x command tree and the `--filter` system | 24 | `^## COMMAND:` |
@@ -314,7 +354,7 @@ Counts are verified against the files, not asserted: regenerate with
 - `references/functions.md` — built-in functions by category. `grep '^## FUNCTION: get_env'`
 - `references/cli-reference.md` — full 1.0 command tree + `--filter` system.
   `grep '^## COMMAND: stack run'`
-- `references/error-patterns.md` — 65 diagnosed errors. Every one names likely causes; **53
+- `references/error-patterns.md` — 69 diagnosed errors. Every one names likely causes; **57
   carry a fix**, and an entry with no `**Solutions:**` section has none to give — say so
   rather than improvising one. Grep error keywords first:
   `grep -in 'state lock' references/error-patterns.md`

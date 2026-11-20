@@ -260,6 +260,10 @@ Generate a new Terragrunt unit from a module, filling in its inputs.
 
 **Usage:** `terragrunt scaffold [flags] [module-url] [template-url]`
 
+**v1.2.2:** a relative `--output-folder` or `--var-file` resolves against `--working-dir`, not the
+shell's directory, and a relative local module path is written into the generated `source`
+relative to the output folder. Below v1.2.2 the two agreed only when `--output-folder` was unset.
+
 **Scaffolding is done by boilerplate, not by Terragrunt itself.** The engine is
 [gruntwork-io/boilerplate](https://github.com/gruntwork-io/boilerplate) (MPL-2.0, Go), and
 knowing that is the difference between "the prompts are whatever Terragrunt decided" and
@@ -497,6 +501,11 @@ Docs: https://docs.terragrunt.com/reference/cli/commands/info/print/
 Render the final Terragrunt configuration after all processing.
 
 **Usage:** `terragrunt render [flags]`
+
+**`--all` and filters, v1.2.2:** `render --all`, `info print --all` and `aws-provider-patch --all`
+accepted `--filter` and then acted on every unit, and `render --all` ignored
+`--discovery-boundary`; `backend bootstrap|delete --all` ignored `.terragrunt-filters` and
+`.terragrunt-excludes`. From v1.2.2 all five act only on the selected units, as `run --all` does.
 
 Outputs the final, merged Terragrunt configuration after processing all
 includes, dependencies, and function calls. This is useful for debugging
