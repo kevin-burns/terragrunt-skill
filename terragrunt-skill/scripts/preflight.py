@@ -118,6 +118,15 @@ GATES = (
         "still EXPERIMENTAL: variables block (--experiment variables-block), "
         "terraform.no_dot_terragrunt_cache (--experiment no-dot-terragrunt-cache)",
     )),
+    ("1.2.3", "advice, strict control and opt-in experiments", (
+        "--strict-control use-partial-parse-config-cache (the flag has no effect; remove it)",
+        "plan -detailed-exitcode: an ignored plan error exits 0, a signal-killed tofu exits 1",
+        "--auth-provider-cmd response reused across units      --experiment auth-provider-cache",
+        "dependency on a unit with no outputs -> empty object  --experiment empty-dependency-outputs",
+        "outputs block with mock values on the unit            --experiment outputs-block",
+        "path.unit / path.stack / path.include / path.read     --experiment path-variable",
+        "values block declaring a unit's or stack's values     --experiment values-block",
+    )),
 )
 
 # Changes that break a working configuration on upgrade WITHOUT anyone enabling anything.
@@ -254,6 +263,33 @@ HAZARDS = {
         "scaffold resolves relative --output-folder and --var-file against --working-dir.",
         "OpenTelemetry: terraformCommand / terraform_command -> tofu_command, "
         "terraform_cli_args -> tofu_cli_args; <command>_duration keeps only the dir label.",
+    )),),
+    "1.2.3": ((None, (
+        "render, info print, stack generate, stack output and aws-provider-patch REJECT run-only "
+        "flags they used to ignore (--out-dir, --report-file, --no-hooks, ...): 'is not a valid "
+        "flag for'. Remove the flag; it never did anything there.",
+        "run --all --config main.hcl selects ONLY files named main.hcl; directories with just a "
+        "terragrunt.hcl are skipped.",
+        "terragrunt.hcl beats terragrunt.hcl.json in the same directory for every command, "
+        "including a dependency read and read_terragrunt_config (since v0.50.15 they read the .json).",
+        "run --all waits on the dependencies of an EXCLUDED unit (a -> b(excluded) -> c: a waits "
+        "for c); a cycle through excluded units fails 'cycle detected during queue construction'.",
+        "A local in terragrunt.stack.hcl that can never be evaluated (undefined or cyclic) is now "
+        "an error ('Could not evaluate all locals in block'); it used to be dropped silently.",
+        "terraform_binary, terraform_version_constraint and terragrunt_version_constraint reject "
+        "any dependency reference ('Dependency reference not allowed'). Use a literal, local or env.",
+        "errors blocks: the FIRST matching retry/ignore block in declaration order handles an "
+        "error; it used to be picked arbitrarily on each attempt.",
+        "--filter depth ('1...vpc') counts only dependencies, so a filter can select MORE units "
+        "when dependents sit outside the working directory.",
+        "The CAS ignores the repository's local Git config (url.<base>.insteadOf, "
+        "http.extraHeader); only global and system config apply. A failed CAS fetch of an "
+        "update_source_with_cas component now fails stack generate instead of copying it unrewritten.",
+        "Map/list inputs pass ${ and %{ through as written: a module that decoded the JSON itself "
+        "and stripped the old $${ now receives the string unescaped.",
+        "render --format json prints numbers in full (1e21 -> 1000000000000000000000).",
+        "hcl validate --show-config-path --json prints [] not null when nothing is invalid.",
+        "terragrunt.hcl.json units are now DISCOVERED by find, list, run --all and --filter.",
     )),),
 }
 

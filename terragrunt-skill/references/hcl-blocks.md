@@ -279,6 +279,31 @@ dependency "vpc" {
 }
 ```
 
+**v1.2.3:** `run --all`, `find --dependencies`, `dag graph` and graph filters now read a
+`config_path` that names a file (`../shared/other.hcl`) and resolve its relative paths from that
+file's directory; they used to fail without a `terragrunt.hcl`, or read the `terragrunt.hcl`
+instead. Naming a file stays deprecated (strict control `dependency-config-path-file`): emit the
+directory. Two experiments, **do not emit unless the repo enables them**:
+`--experiment empty-dependency-outputs` resolves `dependency.<name>.outputs` to `{}` for a unit
+with no outputs (or not applied) when no mock applies, so a block can exist purely for ordering;
+`--experiment outputs-block` lets the depended-on unit declare its outputs and mock values
+itself, which dependents read without `mock_outputs`:
+
+```hcl
+# on the unit being depended on (experiment outputs-block)
+outputs {
+  mock_strategy {
+    allowed_commands = ["validate", "plan"]
+  }
+  output "vpc_id" {
+    mock_value = "vpc-mock-id"
+  }
+}
+```
+
+`hcl validate --outputs` checks each declared output exists in the module and that dependents
+read only declared outputs. Declaring the block without the experiment is an error.
+
 Related: dependencies, inputs
 
 ## ATTRIBUTE: download_dir
@@ -566,6 +591,13 @@ inputs = merge(
 
 Related: locals, dependency
 
+**v1.2.3, `${` and `%{` in map and list inputs.** A map, list or object input is passed as JSON.
+From v1.2.3 a string inside it reaches the module **as written**: `%%{ if x }` in HCL arrives as
+`%{ if x }`, and `$${instance}` arrives as `${instance}`, whether the variable is typed as a
+map/list/object or as `string` and decoded with `jsondecode`. Before v1.2.3 a `%{` failed with
+`Invalid template control keyword` for a typed variable, and a `string` variable received
+`$${`. Remove any workaround that stripped the extra `$`.
+
 ## BLOCK: locals
 
 **Locals Block**  |  Category: core
@@ -848,6 +880,12 @@ errors {
 > attribute; on its own at the top of a `terragrunt.hcl` it is the pre-1.0 form. A grep alone
 > cannot tell them apart — check the enclosing block.
 
+> **Order matters from v1.2.3.** When two `retry` blocks, or two `ignore` blocks, match the same
+> error, the **first one in declaration order** handles it. Before v1.2.3 Terragrunt picked one
+> arbitrarily, and again on every attempt, so a narrow `retry` with `max_attempts = 2` could be
+> reported against a broader block's `4`. Put the narrowest pattern first. With an `include` that
+> uses `merge_strategy = "deep"`, see "Matching errors" in the block reference for the merged order.
+
 Verified against <https://docs.terragrunt.com/reference/hcl/blocks/> on 2026-08-19. The docs do
 not state which release introduced this block; it is 1.x and the attributes it replaced were
 pre-1.0.
@@ -1084,6 +1122,12 @@ terraform_binary = "~/.tfenv/bin/terraform"
 
 Related: terraform_version_constraint
 
+**v1.2.3: no `dependency` references.** `terraform_binary`, `terraform_version_constraint` and
+`terragrunt_version_constraint` reject any `dependency.*` reference with `Dependency reference not
+allowed`, including one in a conditional branch, because versions are checked before any
+dependency runs. Set them from a literal, a local or `get_env()`. `info print` now reports a
+unit's `terraform_binary`, including one set in an included file.
+
 ## ATTRIBUTE: terragrunt_version_constraint
 
 **Terragrunt Version Constraint Attribute**  |  Category: core
@@ -1166,6 +1210,28 @@ unit "rds" {
 Inside `catalog/units/rds/terragrunt.hcl` those are read as `values.instance_class`, `values.environment`.
 
 Related: stack, terraform
+
+**v1.2.3 experiment `values-block` (do not emit unless enabled).** A unit or stack declares the
+`values` it accepts, with type, default, description and `nullable`; `stack generate` then fails
+on an undeclared key, a wrong type or a missing required value, and `hcl validate` reports reads
+of undeclared `values.<name>`. Without the block, `stack generate` prints a once-per-run tip when
+a unit reads `values.x` inside `try()` for a default.
+
+```hcl
+values {
+  value "name" {
+    type = string
+  }
+  value "tags" {
+    type    = map(string)
+    default = {}
+  }
+}
+```
+
+**v1.2.3 experiment `path-variable`.** `path.unit`, `path.stack`, `path.download`, `path.include`
+and `path.read` name each location directly, where `get_terragrunt_dir()` and friends return
+different directories in a unit, an include, and a `read_terragrunt_config` file.
 
 ## BLOCK: stack
 

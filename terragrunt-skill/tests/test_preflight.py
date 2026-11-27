@@ -163,15 +163,36 @@ def test_1_2_1_reports_its_hazards():
     assert "ahead of every gate" not in out
 
 
-def test_1_2_2_reports_its_hazards_and_is_the_newest_gate():
+def test_1_2_2_reports_its_hazards():
     out = lines_for("1.2.2")
-    assert "DO NOT EMIT" not in out
+    assert "v1.2.2+" not in out.split("DO NOT EMIT", 1)[1]
     hazards = out.split("UPGRADE HAZARDS", 1)[1]
     for needle in ("config_path = null", "enabled = false", "null value is not allowed",
                    "actions = []", "cas-source-inside-stack", "inputs-read-not-tracked",
                    "--working-dir", "tofu_command"):
         assert needle in hazards, needle
     assert "ahead of every gate" not in out
+
+
+def test_1_2_3_reports_its_hazards_and_is_the_newest_gate():
+    out = lines_for("1.2.3")
+    assert "DO NOT EMIT" not in out
+    hazards = out.split("UPGRADE HAZARDS", 1)[1]
+    for needle in ("is not a valid", "--config main.hcl", "terragrunt.hcl.json",
+                   "cycle detected during queue construction", "Could not evaluate all locals",
+                   "Dependency reference not allowed", "declaration order", "insteadOf",
+                   "%{", "[] not null"):
+        assert needle in hazards, needle
+    for experiment in ("auth-provider-cache", "empty-dependency-outputs", "outputs-block",
+                       "path-variable", "values-block"):
+        assert experiment in out, experiment
+    assert "ahead of every gate" not in out
+
+
+def test_the_1_2_3_hazards_are_not_reported_on_1_2_2():
+    out = lines_for("1.2.2")
+    assert "Dependency reference not allowed" not in out
+    assert "v1.2.3+" in out.split("DO NOT EMIT", 1)[1]
 
 
 def test_the_1_2_2_hazards_are_not_reported_on_1_2_1():

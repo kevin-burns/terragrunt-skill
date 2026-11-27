@@ -288,6 +288,43 @@ read ONLY the listed reference(s), then act. References are grep-friendly — pr
      renamed (`terraformCommand`/`terraform_command` → `tofu_command`,
      `terraform_cli_args` → `tofu_cli_args`) and `<command>_duration` has one label, `dir`.
 
+   **v1.2.3 (released 2026-11-25) graduated nothing, and several fixes change what a working
+   setup does.** Recommend it over v1.2.2 wherever `plan -detailed-exitcode` gates CI: an
+   `errors`-ignored plan error no longer exits 1, and a `tofu` killed by a signal (OOM) no longer
+   exits 0.
+   - **Five commands reject `run` flags they used to ignore:** `render`, `info print`,
+     `stack generate`, `stack output` and `aws-provider-patch` now fail on `--out-dir`,
+     `--report-file`, `--no-hooks` and the rest (`flag … is not a valid flag for render`). Never
+     emit a run-only flag on those commands. Reproduced on 1.2.3.
+   - **Configs that passed now fail:** an unevaluable local in `terragrunt.stack.hcl` (reproduced
+     on 1.2.3), and any `dependency` reference in `terraform_binary` or either version
+     constraint (`Dependency reference not allowed`, reproduced on 1.2.3). Set those from a
+     literal, local or env var.
+   - **Same config, different run:** `run --all --config X` selects only files named X;
+     `terragrunt.hcl` beats `terragrunt.hcl.json` everywhere; `run --all` waits on an excluded
+     unit's dependencies, and a cycle through excluded units fails; `errors` blocks match in
+     declaration order, so put the narrow `retry`/`ignore` first; a `--filter` depth counts
+     dependencies only and can select more units.
+   - **CAS ignores the repo's own Git config** (`url.<base>.insteadOf`, `http.extraHeader`); only
+     global and system config apply, and a failed fetch under `update_source_with_cas` now fails
+     `stack generate`. Advise moving those settings to global config.
+   - **Map and list `inputs` pass `${` and `%{` through as written**, so a template string reaches
+     the module unescaped; drop any workaround that stripped `$${`.
+   - **Fixes worth knowing:** auto-init no longer re-runs `init` before every command (units with
+     no provider, or a stray `module "` in `examples/`), and `terragrunt init` clears
+     `.terragrunt-init-required`; `fileset` accepts `./`, `../` and `//` patterns; `--all`
+     commands resolve `get_original_terragrunt_dir()`/`get_working_dir()` per unit;
+     `terragrunt.hcl.json` units are discovered; `stack output 1-vpc` works; `run --all plan` is
+     up to 63% faster. Strict control `use-partial-parse-config-cache` marks a flag that does
+     nothing.
+   - **Experiments (opt-in, do not emit unless the repo enables them):** `values-block` (declare a
+     unit's or stack's accepted `values` with types and defaults; `stack generate` rejects
+     undeclared or mistyped values), `outputs-block` (declare outputs and mock values on the unit,
+     checked by `hcl validate --outputs`), `path-variable` (`path.unit`, `path.stack`,
+     `path.include`, `path.read`, `path.download`), `empty-dependency-outputs` (a dependency with
+     no outputs resolves to `{}`), `auth-provider-cache` (reuse one `--auth-provider-cmd`
+     response across matching units for a TTL).
+
    These references cover only some of the active experiments, so an unfamiliar `--experiment` value
    is not evidence that it is wrong — look it up rather than flagging it. For anything newer,
    niche, or not found in the references, look it up — do not guess. In order:
@@ -331,7 +368,7 @@ the fastest route to an answer is the grep handle, not the filename.
 
 | Reference | Holds | Entries | Grep handle |
 |---|---|---|---|
-| `error-patterns.md` | diagnosed errors: likely causes for every one, a fix for 57 | 69 | `^## ERROR:` |
+| `error-patterns.md` | diagnosed errors: likely causes for every one, a fix for 62 | 74 | `^## ERROR:` |
 | `functions.md` | built-in functions by category | 31 | `^## FUNCTION:` |
 | `best-practices.md` | practices, plus comparisons and decision guides | 29 / 7 / 3 | `^## PRACTICE:` `^## COMPARISON:` `^## DECISION:` |
 | `cli-reference.md` | the 1.x command tree and the `--filter` system | 24 | `^## COMMAND:` |
@@ -354,7 +391,7 @@ Counts are verified against the files, not asserted: regenerate with
 - `references/functions.md` — built-in functions by category. `grep '^## FUNCTION: get_env'`
 - `references/cli-reference.md` — full 1.0 command tree + `--filter` system.
   `grep '^## COMMAND: stack run'`
-- `references/error-patterns.md` — 69 diagnosed errors. Every one names likely causes; **57
+- `references/error-patterns.md` — 74 diagnosed errors. Every one names likely causes; **62
   carry a fix**, and an entry with no `**Solutions:**` section has none to give — say so
   rather than improvising one. Grep error keywords first:
   `grep -in 'state lock' references/error-patterns.md`

@@ -23,7 +23,7 @@ the listed reference, act:
 | Scaffold configs, envs, stacks | GENERATE | `architecture-patterns.md` + `templates/` |
 | Validate / lint / CI | VALIDATE | `scripts/validate.sh`, `cli-reference.md` |
 | Review or audit a repo | REVIEW | `best-practices.md` |
-| An error was pasted | DIAGNOSE | grep `error-patterns.md` — 69 diagnosed errors, 57 with a fix |
+| An error was pasted | DIAGNOSE | grep `error-patterns.md` — 74 diagnosed errors, 62 with a fix |
 | "What does X do" | LOOKUP | grep the matching reference |
 | Multi-account, mocks, AVM, CFT | EXAMPLES | `advanced-examples.md` — 28 worked examples |
 | OIDC, plan-then-apply pipelines | CI/CD | `cicd.md` |
@@ -113,6 +113,21 @@ so. `render`, `info print` and `aws-provider-patch --all` now honour filters, an
 attribute names changed. Two experiments arrived: `variables-block` and `no-dot-terragrunt-cache`.
 The null `config_path`, null `if`, strict control and `inputs` read were reproduced on 1.2.2.
 
+### What v1.2.3 changed for this skill
+
+v1.2.3 (2026-11-25) graduated nothing, but it changes what working setups do. `render`, `info
+print`, `stack generate`, `stack output` and `aws-provider-patch` now reject the `run` flags they
+used to ignore, so a CI step passing one shared flag set to every command breaks. A stack-file
+local that can never be evaluated is an error, and `terraform_binary` and the version constraints
+refuse `dependency` references. `run --all --config X` selects only files named X,
+`terragrunt.hcl` beats `terragrunt.hcl.json`, `run --all` waits on the dependencies of excluded
+units, `errors` blocks match in declaration order, and the CAS ignores the repository's own Git
+config. Map and list `inputs` now pass `${` and `%{` through unescaped. `-detailed-exitcode` stops
+reporting two kinds of failure wrongly, so the skill recommends 1.2.3 for plan-gated CI. Five
+experiments arrived: `values-block`, `outputs-block`, `path-variable`, `empty-dependency-outputs`
+and `auth-provider-cache`. The rejected flag, the stack local and the dependency reference were
+reproduced on 1.2.3; the rest comes from the release notes.
+
 So: **when a Terragrunt release lands, re-read the release body in full** before trusting
 these references. Not the summary — the Experiments section sits well below the fold, and
 skimming it is exactly how the v1.1.2 Azure reversal was nearly missed, and how the
@@ -128,7 +143,9 @@ release-candidate warning missed the generated-file and Azure-bootstrap changes 
   producing a plausible-looking account ID or secret.
 - **It does not cover every experiment.** Eighteen were active as of v1.1.3, v1.1.5 added
   `offline-cas`, `base64gzip-compat` and a reserved `tg-login`, v1.2.0 completed eleven and
-  added `mcp-command`, v1.2.2 added `variables-block` and `no-dot-terragrunt-cache`, and these
+  added `mcp-command`, v1.2.2 added `variables-block` and `no-dot-terragrunt-cache`, v1.2.3
+  added five more (`values-block`, `outputs-block`, `path-variable`, `empty-dependency-outputs`,
+  `auth-provider-cache`), and these
   references cover only some. An unfamiliar `--experiment` value is *not* evidence that it
   is wrong — look it up rather than flagging it.
 - **It does not assume OpenTofu or Terraform.** Terragrunt orchestrates either; the skill

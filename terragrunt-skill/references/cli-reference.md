@@ -103,6 +103,11 @@ terragrunt run --all plan --filter '...vpc'            # vpc and everything down
 ```
 Docs: https://docs.terragrunt.com/features/filter/ · graph: https://docs.terragrunt.com/features/filter/graph/ · git: https://docs.terragrunt.com/features/filter/git/. For full syntax, fetch those pages or use C7 search.
 
+**v1.2.3:** a depth (`1...vpc`) counts only dependencies between a unit and the target, so a
+filter run below the repo root can now select dependents elsewhere in the repo that it used to
+miss. Two graph filters reaching a shared unit select the same set every run. Dependent filters
+from below the root are much faster (one search, not one per dependent).
+
 ## COMMAND: backend bootstrap
 
 **Category:** backend
@@ -463,6 +468,11 @@ terragrunt hcl validate --json
 
 Docs: https://docs.terragrunt.com/reference/cli/commands/hcl/validate/
 
+**v1.2.3:** `--inputs` reads `-var`/`-var-file` split across two arguments and the `--var`
+spellings, and resolves a relative `-var-file` from the unit's run directory. `--show-config-path
+--json` prints `[]`, not `null`, when nothing is invalid. `--outputs` checks the experimental
+`outputs` block.
+
 ## COMMAND: info print
 
 **Category:** configuration
@@ -506,6 +516,17 @@ Render the final Terragrunt configuration after all processing.
 accepted `--filter` and then acted on every unit, and `render --all` ignored
 `--discovery-boundary`; `backend bootstrap|delete --all` ignored `.terragrunt-filters` and
 `.terragrunt-excludes`. From v1.2.2 all five act only on the selected units, as `run --all` does.
+
+**Run-only flags are rejected, v1.2.3.** `render`, `info print`, `stack generate`, `stack output`
+and `aws-provider-patch` used to accept every `run` flag and ignore the ones that only affect a
+run, so `render --all --out-dir plans` wrote nothing. They now fail:
+``flag `--out-dir` is not a valid flag for `render` ``. Never emit `--out-dir`,
+`--json-out-dir`, `--report-file`, `--report-format`, `--summary-*`, `--no-hooks`,
+`--no-auto-retry`, `--queue-ignore-*`, `--graph-root` or the destroy-check flags on these
+commands. Unit selection (`--queue-include-dir`, `--queue-exclude-dir`, `--filter`) still works.
+`stack run` only drops `--graph-root`. `render --format json` now prints numbers in full
+(`1e21` as `1000000000000000000000`), and `--all` resolves `get_original_terragrunt_dir()` and
+`get_working_dir()` per unit.
 
 Outputs the final, merged Terragrunt configuration after processing all
 includes, dependencies, and function calls. This is useful for debugging
@@ -686,6 +707,21 @@ terragrunt run --all -- apply -auto-approve
 ```
 
 Docs: https://docs.terragrunt.com/reference/cli/commands/run/
+
+**v1.2.3 changes to `run --all`:**
+- `--config main.hcl` with `--all` treats **only** files named `main.hcl` as units; a directory with
+  just a `terragrunt.hcl` is skipped.
+- `terragrunt.hcl` takes precedence over `terragrunt.hcl.json` in the same directory for every
+  command, and `terragrunt.hcl.json`-only units are now discovered.
+- A unit waits on the dependencies of an **excluded** unit (`a -> b(excluded) -> c`: `a` waits for
+  `c`; destroy reverses it). A cycle through excluded units fails `cycle detected during queue
+  construction`.
+- `-detailed-exitcode`: a plan error matched by an `errors` `ignore` block exits 0, and a `tofu`
+  killed by a signal records 1 instead of 0.
+- `--use-partial-parse-config-cache` does nothing and warns; strict control
+  `use-partial-parse-config-cache` makes it an error. Remove it.
+- `--experiment auth-provider-cache`: the `--auth-provider-cmd` script can return a `cache`
+  object (`root`, `globs`, `ttl`) and Terragrunt reuses the response for every matching unit.
 
 ## COMMAND: apply
 

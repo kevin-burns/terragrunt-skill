@@ -249,6 +249,14 @@ Docs: https://docs.terragrunt.com/features/run-queue/ · https://docs.terragrunt
 
 Docs: https://docs.terragrunt.com/features/auto-init/ · https://docs.terragrunt.com/troubleshooting/performance/
 
+**v1.2.3 overhead cuts.** `run --all plan` up to 63% faster and up to 18% less peak memory at
+1,000 units; `find --dependencies` up to 89% less memory; `find`, `list`, `dag graph`, `hcl fmt`,
+`hcl validate`, `catalog`, `scaffold`, `info strict` and `stack clean` no longer probe
+`tofu -version` (about half the start-up time). Auto-init stops running `init` before every
+command for units with no provider or a stray `module "` in a subdirectory. Gruntwork's
+benchmarks, not reproduced here. For many units sharing credentials, `--experiment
+auth-provider-cache` stops `--auth-provider-cmd` running per unit.
+
 ## CI output, exit codes & run reports
 
 - **`--log-format json`** (also `pretty`/`bare`/`key-value`) for machine-parseable logs;

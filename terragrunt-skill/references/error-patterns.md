@@ -48,6 +48,11 @@
 - [ERROR: Unsuitable value: null value is not allowed (exclude if)](#error-unsuitable-value-null-value-is-not-allowed-exclude-if)
 - [ERROR: update_source_with_cas source inside the stack directory](#error-update_source_with_cas-source-inside-the-stack-directory)
 - [ERROR: encountered unencrypted payload without unencrypted method configured](#error-encountered-unencrypted-payload-without-unencrypted-method-configured)
+- [ERROR: flag is not a valid flag for render (or info print, stack generate, stack output, aws-provider-patch)](#error-flag-is-not-a-valid-flag-for-render-or-info-print-stack-generate-stack-output-aws-provider-patch)
+- [ERROR: Could not evaluate all locals in block (terragrunt.stack.hcl)](#error-could-not-evaluate-all-locals-in-block-terragruntstackhcl)
+- [ERROR: Dependency reference not allowed](#error-dependency-reference-not-allowed)
+- [ERROR: cycle detected during queue construction](#error-cycle-detected-during-queue-construction)
+- [ERROR: sets update_source_with_cas, which only the CAS can rewrite](#error-sets-update_source_with_cas-which-only-the-cas-can-rewrite)
 - [ERROR: Undefined local reference](#error-undefined-local-reference)
 - [ERROR: Working directory error](#error-working-directory-error)
 - [ERROR: Circular dependency detected](#error-circular-dependency-detected)
@@ -85,7 +90,7 @@
 > both of which were live and undocumented for four releases. Neither has been reproduced
 > against a binary; they are read from the changelog and labelled as such.
 >
-> **What that means for you.** Every entry names likely causes. **Of the 69 entries, only 57 carry a fix**, and an
+> **What that means for you.** Every entry names likely causes. **Of the 74 entries, only 62 carry a fix**, and an
 > entry with no `**Solutions:**` section has none to give — say so rather than improvising one.
 > An entry carrying a "Verified against terragrunt 1.1.3" line was checked against the binary
 > on that date; the rest were not, and may describe a pre-1.0 world. Flag and avoid pre-1.0
@@ -109,8 +114,8 @@ cause.
 - **authentication** (3): AWS credentials not found, Azure authentication required, GCP credentials not found
 - **backend** (5): S3 bucket does not exist, Access denied to backend, GCS bucket not found, Azure storage account not found, Azure backend 403 (shared key disabled / missing RBAC)
 - **provider** (1): azurerm provider requires subscription_id (v4+)
-- **configuration** (34): HCL that will not parse or evaluate, the seven `include` entries, the five `generate` entries, the five `locals` entries, the seven hook entries, No Terraform configuration files found, Missing required input variable, Remote state configuration missing, Invalid terraform source, Working directory error, ParentFileNotFoundError on a file that sits beside the config
-- **dependency** (17): Circular dependency detected, Module not found, Could not download source, `invalid repository name` from a `depth=` query parameter (v1.1.0–1.1.3), `CAS processing failed … source escapes repository root` (v1.1.0–1.1.3), Git authentication failed, Git ref not found, Module subdirectory not found, Module registry unavailable, Module checksum mismatch…
+- **configuration** (37): HCL that will not parse or evaluate, the seven `include` entries, the five `generate` entries, the five `locals` entries, the seven hook entries, No Terraform configuration files found, Missing required input variable, Remote state configuration missing, Invalid terraform source, Working directory error, ParentFileNotFoundError on a file that sits beside the config, a `run` flag passed to `render` and friends (v1.2.3+), an unevaluable stack-file local (v1.2.3+), a dependency reference in a version constraint (v1.2.3+)
+- **dependency** (19): Circular dependency detected, a cycle through excluded units (v1.2.3+), a failed CAS fetch under `update_source_with_cas` (v1.2.3+), Module not found, Could not download source, `invalid repository name` from a `depth=` query parameter (v1.1.0–1.1.3), `CAS processing failed … source escapes repository root` (v1.1.0–1.1.3), Git authentication failed, Git ref not found, Module subdirectory not found, Module registry unavailable, Module checksum mismatch…
 - **network** (2): Network timeout, Connection refused
 - **state** (4): Error acquiring state lock, Backend configuration changed, Failed to get existing workspaces, encountered unencrypted payload without unencrypted method configured
 - **terraform** (3): Terraform version constraint not met, Provider not found, Provider version constraint
@@ -1388,6 +1393,125 @@ encryption = {
   fallback     = { method = "unencrypted" }
 }
 ```
+
+## ERROR: flag is not a valid flag for render (or info print, stack generate, stack output, aws-provider-patch)
+**Category:** configuration
+
+```
+ERROR  flag `--out-dir` is not a valid flag for `render`. Did you mean to use `run --out-dir`?
+```
+
+Reproduced on 1.2.3. From v1.2.3 `render`, `info print`, `stack generate`, `stack output` and
+`aws-provider-patch` reject the `run` flags they used to accept and ignore. Below v1.2.3 the same
+command succeeded and did nothing with the flag: `render --all --out-dir plans` wrote no plans, and
+`stack generate --report-file report.json` wrote no report.
+
+**Likely causes:**
+- A script or CI step passing a shared flag set (`--out-dir`, `--report-file`, `--no-hooks`,
+  `--queue-ignore-errors`, `--summary-disable`, ...) to every Terragrunt command.
+- `aws-provider-patch` given a flag it does not define, such as `--graph` or `--json`.
+
+**Solutions:**
+
+Remove the flag from that command; it never had an effect there. Unit-selection flags
+(`--queue-exclude-dir`, `--queue-include-dir`, `--filter`) still work. Environment variables such as
+`TG_OUT_DIR` can stay set, because a command reads only the variables of flags it accepts.
+
+## ERROR: Could not evaluate all locals in block (terragrunt.stack.hcl)
+**Category:** configuration
+
+```
+ERROR   on /live/terragrunt.stack.hcl line 3, in locals:
+ERROR    3:   name = "${local.envv}-app"
+ERROR The local "envv" could not be evaluated. It is either undefined, part of a reference cycle, or depends on a value that locals cannot reference.
+* failed to read stack file /live/terragrunt.stack.hcl in /live Could not evaluate all locals in block.
+```
+
+Reproduced on 1.2.3 with `stack generate`. From v1.2.3 a stack file fails on such a local the way
+a unit file does. Below v1.2.3 the local was dropped silently, and the stack failed only if
+something read it.
+
+**Likely causes:**
+- A typo in a local name (`local.envv` for `local.env`).
+- Two locals that reference each other.
+
+**Solutions:**
+
+Fix the reference, or delete the local if nothing uses it. A stack that generated cleanly on
+v1.2.2 can fail on v1.2.3 for a local that was never read.
+
+## ERROR: Dependency reference not allowed
+**Category:** configuration
+
+```
+error: Dependency reference not allowed
+ --> u/terragrunt.hcl:5:32
+  |
+5 | terraform_version_constraint = dependency.dep.outputs.constraint
+  |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = The terraform_version_constraint attribute can't reference dependency
+    outputs, because Terragrunt checks versions before any dependency has run.
+```
+
+Reproduced on 1.2.3 with `hcl validate`. Applies to `terraform_binary`,
+`terraform_version_constraint` and `terragrunt_version_constraint`. Below v1.2.3 such a reference
+failed with `There is no variable named "dependency"` in `run` and `value must be known` in
+`run --all`, while one in a conditional branch that never evaluated passed.
+
+**Likely causes:**
+- A version or binary choice driven by another unit's output.
+- A conditional that only reads the dependency on some branches.
+
+**Solutions:**
+
+Set the attribute from a literal, a local, or an environment variable
+(`get_env("TG_TF_CONSTRAINT", ">= 1.6")`). Versions are checked before any dependency runs, so an
+output can never feed them.
+
+## ERROR: cycle detected during queue construction
+**Category:** dependency
+
+```
+cycle detected during queue construction
+```
+
+From the v1.2.3 release notes; not reproduced. From v1.2.3 `run --all` waits on the dependencies
+of an excluded unit: with `a -> b -> c` and `b` excluded, `a` starts only after `c`. Units that
+depend on one another in a cycle that runs through excluded units now fail. Below v1.2.3 `a`
+started without waiting for `c`, so the cycle went unnoticed.
+
+**Likely causes:**
+- A dependency loop broken only by excluding one unit (`exclude` block, `--queue-exclude-dir` or a
+  negative `--filter`).
+
+**Solutions:**
+
+Remove one of the dependencies in the cycle. Excluding a unit no longer breaks a loop through it.
+Run `terragrunt dag graph` to see the loop.
+
+## ERROR: sets update_source_with_cas, which only the CAS can rewrite
+**Category:** dependency
+
+```
+<component> sets update_source_with_cas, which only the CAS can rewrite, and fetching it through the CAS failed: <error>
+```
+
+From the v1.2.3 release notes; not reproduced. Below v1.2.3 `stack generate` copied the component
+without rewriting its sources when the CAS fetch failed, so the generated stack pointed at the
+wrong sources and nothing said so.
+
+**Likely causes:**
+- The CAS cannot reach or authenticate to the Git source.
+- A source that only resolves through the repository's own Git config. From v1.2.3 the CAS ignores
+  the local Git config of the repository Terragrunt runs in (`url.<base>.insteadOf`,
+  `http.extraHeader`) and uses only the global and system config.
+
+**Solutions:**
+
+Read the `<error>` part first. If the source depended on an `insteadOf` or `extraHeader` in the
+repository's `.git/config`, move that setting to the global config (`git config --global`) or to
+the CI runner's system config, or write the real URL in the source.
 
 ## ERROR: Undefined local reference
 **Category:** configuration
